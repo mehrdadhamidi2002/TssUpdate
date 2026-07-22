@@ -3480,7 +3480,7 @@ FROM
 
 go
 
-CREATE PROCEDURE Tss_SalUntInvoice_HdVStp  
+alter PROCEDURE Tss_SalUntInvoice_HdVStp  
 (    
    @InternalWhere VarChar(8000)='',   
    @Where VarChar(8000)='',   
@@ -3757,12 +3757,12 @@ BEGIN
     -- Fast path: "give me the lines for one invoice" is the dominant call pattern.
     -- Detect it and bind a real, typed parameter so SQL Server can seek and
     -- reuse a cached plan, instead of scanning + recompiling every call.
-    IF @Trimmed LIKE 'SiSalInvoice_Hd=%'
-       AND @Where = ''
-       AND TRY_CONVERT(INT, SUBSTRING(@Trimmed, 17, 8000)) IS NOT NULL
-    BEGIN
-        SET @SalInvoiceHd = TRY_CONVERT(INT, SUBSTRING(@Trimmed, 17, 8000));
-    END;
+	IF @Trimmed LIKE 'SiSalInvoice_Hd=%'
+	   AND @Where = ''
+	   AND ISNUMERIC(SUBSTRING(@Trimmed, 17, 8000)) = 1
+	BEGIN
+		SET @SalInvoiceHd = CONVERT(INT, SUBSTRING(@Trimmed, 17, 8000));
+	END;
 
     SET @OrderClause = CASE
                             WHEN @Order <> '' THEN N' ORDER BY ' + @Order
