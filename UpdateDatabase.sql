@@ -3016,7 +3016,6 @@ FROM
 ) CalcSel ' + @Where + @Order)
 
 GO
-
 ALTER PROC Tss_StdUserShortCuts
 (
     @SiUser NUMERIC = 1
@@ -3024,6 +3023,13 @@ ALTER PROC Tss_StdUserShortCuts
 AS
 BEGIN
     SET NOCOUNT ON;
+
+    DECLARE @IsAdmin BIT = 0;
+    
+    -- Check if the user is an admin
+    SELECT @IsAdmin = CASE WHEN Sta_UserManagerState = 1 THEN 1 ELSE 0 END
+    FROM Tss_StdSystemUsers
+    WHERE SiPubPersonsSpec = @SiUser;
 
     ;WITH AccessibleLeaves AS
     (
@@ -3039,7 +3045,7 @@ BEGIN
             Tss_StdSystemMenuItems.Num_SysMenuClass = 0
             AND Tss_StdSystemMenuItems.Sta_SystemMenuLeaf = 1     -- only actual leaves/shortcuts
             AND Tss_StdUserAccsessRight.Sta_UarCanView = 1        -- BIT: 1 = TRUE
-            AND (@SiUser = 1 OR Tss_StdSystemUsers.SiPubPersonsSpec = @SiUser)
+            AND Tss_StdSystemUsers.SiPubPersonsSpec = @SiUser
             AND EXISTS (
                 SELECT 1 
                 FROM Tss_PubPersonsSpec p
@@ -3048,7 +3054,7 @@ BEGIN
     ),
     TreeCTE AS
     (
-        -- Anchor: the accessible leaf items themselves
+        -- Anchor: the accessible leaf items themselves (or ALL leaves if admin)
         SELECT
             m.SiStdSystemMenuItems,
             m.SiStdSystemsList,
@@ -3060,8 +3066,17 @@ BEGIN
             m.Num_SystemMenuLevel,
             m.Sta_SystemMenuLeaf
         FROM Tss_StdSystemMenuItems m
-            INNER JOIN AccessibleLeaves al
-                ON al.SiStdSystemMenuItems = m.SiStdSystemMenuItems
+        WHERE 
+            m.Num_SysMenuClass = 0
+            AND m.Sta_SystemMenuLeaf = 1
+            AND (
+                @IsAdmin = 1  -- If admin, show ALL leaves
+                OR EXISTS (
+                    SELECT 1 
+                    FROM AccessibleLeaves al
+                    WHERE al.SiStdSystemMenuItems = m.SiStdSystemMenuItems
+                )
+            )
 
         UNION ALL
 
@@ -4486,8 +4501,7 @@ alter   Procedure Tss_SalUntInvoice_HdIudStp2
 	@FlgInsUpdDel SmallInt  
 ) As 
 
-if dbo.Tss_StdFindSubLoc(0)='Pe
-rsa'
+if dbo.Tss_StdFindSubLoc(0)='Persa'
 	Set @Sta_ContractStatus = 8
 if isnull(@SiPubSubLocations,0)=0
 SELECT     
@@ -4624,8 +4638,7 @@ begin
 					1
 			End
 		*/
-			If (IsNull(@Sta_TransportState,0) 
-<> 0)
+			If (IsNull(@Sta_TransportState,0) <> 0)
 			Begin  
 				exec Tss_SalUntServiceInvoiceIudStp
 					0,  
@@ -4641,8 +4654,7 @@ begin
 			If IsNull(@SiSalInvoice_Hd,0)=0  
 			Begin  
 				Set @SiSalInvoice_Hd=0  
-				Set @Err_Code=
-400  
+				Set @Err_Code=400  
 			End  
 			Return  
 		End 
