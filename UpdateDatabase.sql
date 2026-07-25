@@ -4064,7 +4064,7 @@ alter Procedure Tss_SalUntInvoice_HdIudStp
 	@Num_CurrencyRate numeric=0,
 	@Num_CreditDays int=0,
 	@Sta_ErsalStatus smallint=0,
-	@Sta_ContIsLaminate smallint=0,
+	@Sta_ContIsLaminate smallint=null,
 	@StmSalInvoice_Hd TimeStamp=0,  
 	@SiUser Numeric,  
 	@FlgInsUpdDel SmallInt  
@@ -4495,7 +4495,7 @@ alter   Procedure Tss_SalUntInvoice_HdIudStp2
 	@Num_CurrencyRate numeric=0,
 	@Num_CreditDays int=0,
 	@Sta_ErsalStatus smallint=0,
-	@Sta_ContIsLaminate smallint=0,
+	@Sta_ContIsLaminate smallint=null,
 	@StmSalInvoice_Hd TimeStamp=0,  
 	@SiUser Numeric,  
 	@FlgInsUpdDel SmallInt  
