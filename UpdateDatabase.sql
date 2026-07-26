@@ -4891,3 +4891,245 @@ Begin
 	End
 End
 go
+
+alter PROCEDURE Tss_SalUntFactorsAllDataRepVStp
+(  
+   @InternalWhere VarChar(8000)='',
+   @Where VarChar(8000)='',
+   @Order VarChar(8000)='',
+   @SiSelected VarChar(8000)='0',
+   @FlgSelected SmallInt=0,
+   @FlgMoadianFacts smallint=1,
+   @StartDate varchar(10)='1404/01/01',
+   @EndDate Varchar(10)='1404/12/29'
+) AS
+If @InternalWhere<>''
+   Set @InternalWhere=' Where '+@InternalWhere
+If @Where<>''
+   Set @Where=' Where '+@Where
+
+If @Order<>''
+   Set @Order=' Order By '+@Order
+else
+   Set @Order=' Order By Dat_FactorDate,Cod_FactorCode '
+
+Declare
+   @SqlTxt varchar(MAX),
+   @SqlTxt1 varchar(MAX),
+   @TblName varchar(MAX)
+
+
+Set @TblName='dbo.tRep'+Replace(NewId(),'-','')
+
+--if exists (select * from dbo.sysobjects where id = object_name(N'##TempSalAllRep') and OBJECTPROPERTY(id, N'IsUserTable') = 1)
+ --  drop table ##TempSalAllRep
+
+
+Set @SqlTxt=
+'
+SELECT  distinct   
+	Tss_SalFactor_Hd.Sta_SentToCust,
+	dbo.Tss_StdDaysIncUdf(Tss_SalFactor_Hd.Dat_FactorDate, 	ISNULL(Tss_SalInvoice_HdViw.Num_CreditDays, 60)) AS AfterCreditEndDate, 
+	Tss_SalFactor_Dt.SiSalFactor_Dt, 
+	Tss_SalFactor_Dt.SiPubGoods, 
+	dbo.Tss_StdStaLabelsUdf(1059,dbo.Tss_SalFindGoodsTypeState(Tss_SalFactor_Dt.SiPubGoods)) GoodsTip,
+	Tss_SalFactor_Dt.SiSalFactor_Hd, 
+	Tss_SalFactor_Dt.Num_FactDetRowNo, 
+	Tss_SalFactor_Dt.Des_FactDetDesc, 
+	Tss_SalFactor_Dt.Num_FactDetGoodsNo, 
+	Tss_SalFactor_Dt.Num_FactDetGoodsFee, 
+	Tss_SalFactor_Dt.Sta_FactSrvOrGds, 
+	Tss_SalFactor_Dt.SiPubCustomCodes, 
+	--Tss_SalFactor_Dt.Num_AddedValueRow as Num_AddedTax,
+	--Tss_SalFactor_Hd.Num_AddedValue as Num_AddedTax,
+	Tss_SalFactor_Dt.Num_AddedTax, 
+	Tss_SalFactor_Dt.Num_RowDiscount, 
+	Tss_SalFactor_Dt.Tss_SalFactor_DtRegTime, 
+	Tss_SalFactor_Dt.Tss_SalFactor_DtEditTime, 
+	Tss_SalFactor_Dt.Tss_SalFactor_DtRegisterer, 
+	Tss_SalFactor_Dt.Tss_SalFactor_DtEditor, 
+	Tss_SalFactor_Hd.Cod_FactorCode, 
+	Tss_SalFactor_Hd.Des_FactorDesc, 
+	Tss_SalFactor_Hd.Dat_FactorDate, 
+	SubString(Tss_SalFactor_Hd.Dat_FactorDate,1,4) FactorYear,
+	SubString(Tss_SalFactor_Hd.Dat_FactorDate,6,2) FactorMonth,
+	Tss_SalFactor_Hd.Num_FactorPreRecieveAmount, 
+	Tss_SalFactor_Hd.Num_FactorDiscountAmount, 
+	Tss_SalFactor_Hd.SiAccVoucher_Dt, 
+	Tss_SalFactor_Hd.Sta_FactorHdState, 
+	Tss_SalFactor_Hd.SiPubPersonsSpec, 
+	Tss_SalFactor_Hd.SiPubSubLocations, 
+	Tss_SalFactor_Hd.Sta_InvoiceCodePrint, 
+	Tss_SalFactor_Hd.Num_Karmozd, 
+	Tss_SalFactor_Hd.Sta_HasKarmozd, 
+	Tss_SalFactor_Hd.Sta_JensPrint, 
+	Tss_SalFactor_Hd.Num_FactorDiscountAmount2, 
+	Tss_SalFactor_Hd.Sta_TaxCalc, 
+	Tss_SalFactor_Hd.Tss_SalFactor_HdRegTime, 
+	Tss_SalFactor_Hd.Tss_SalFactor_HdEditTime, 
+	Tss_SalFactor_Hd.Tss_SalFactor_HdRegisterer, 
+	Tss_SalFactor_Hd.Tss_SalFactor_HdEditor, 
+	Cust.Cod_PubPersonCode, 
+	ltrim(rtrim(isnull(Cust.Des_PubPersonName1,'''')))+ltrim(rtrim(isnull(Cust.Des_PubPersonName2,''''))) as Des_FullName, 
+	Cust.Des_PersonAddress, 
+	Cust.Des_PersonPhons, 
+	Cust.Des_Person_FaxNo, 
+	Cust.Des_PersEmailAddress, 
+	Cust.Des_PersPostalCode, 
+	Cust.Des_PersWebSiteAddress, 
+	Cust.Cod_PersEconomicCode, 
+	Cust.Des_OrgManagerName, 
+	Cust.Dat_OrgRegisterDate, 
+	Cust.Cod_OrgRegisterNo, 
+	Cust.Des_PersonAnbarAddress, 
+	Cust.Des_CoAndOrgNationalCode, 
+	Tss_PubSubLocations.Cod_SubLocCode, 
+	Tss_PubSubLocations.Des_SubLocName, 
+	Tss_AccVoucher_Hd.SiAccVoucher_Hd, 
+	Tss_AccVoucher_Hd.Dat_VhedDate, 
+	Saler.Cod_PubPersonCode AS CodSaler, 
+	Saler.Des_FullName AS DesSaler, 
+	Gds.Cod_PubGoodsCode, 
+	Gds.Des_PubGoodsDesc, 
+	Srv.Cod_CustomCodesCode, 
+	Srv.Des_CustomCodesDesc, 
+	Tss_SalInvoice_HdViw.Cod_SaleAgreement, 
+	Tss_SalInvoice_HdViw.Cod_SaleAgreement2, 
+	Tss_SalInvoice_HdViw.Dat_SalReqToContractDate, 
+	Tss_SalInvoice_HdViw.Sta_ContractStatus, 
+	Tss_SalInvoice_HdViw.Sta_MainOrNot, 
+	Tss_SalInvoice_HdViw.Des_CustomCodesDesc AS Mazroof, 
+	Tss_SalInvoice_HdViw.Des_SaleAgreementDesc, 
+	Tss_SalInvoice_HdViw.Cod_PubPersonCode AS CodeContCust, 
+	Tss_SalInvoice_HdViw.Des_FullName AS DesContCust, 
+	Tss_SalInvoice_HdViw.Cod_SaleAgreementChange, 
+	dbo.Tss_PrcDeliRecipCodes(Tss_SalFactor_Hd.SiSalFactor_Hd) AS ResCode,
+	(SELECT        
+		SUM(Tss_InvOutGo_Dt.Num_InvExtDetailGdsAmount)
+	FROM            
+	Tss_InvOutGo_Dt INNER JOIN
+	Tss_InvOutGo_Hd ON Tss_InvOutGo_Dt.SiInvOutGo_Hd = Tss_InvOutGo_Hd.SiInvOutGo_Hd INNER JOIN
+	Tss_SalGdsRecieptToFactor ON Tss_InvOutGo_Hd.SiInvOutGo_Hd = Tss_SalGdsRecieptToFactor.SiInvOutGo_Hd
+	WHERE        
+		(Tss_InvOutGo_Dt.SiInvOutGo_Hd = Tss_SalGdsRecieptToFactor.SiInvOutGo_Hd) AND (Tss_SalGdsRecieptToFactor.SiSalFactor_Hd = Tss_SalFactor_Dt.SiSalFactor_Hd) AND (Tss_InvOutGo_Dt.SiPubGoods = Tss_SalFactor_Dt.SiPubGoods)
+		) ResidShodeh,
+	(SELECT Tss_SalInvoice_Dt.Num_OneMeterSheetPrice FROM Tss_SalInvoice_Dt WHERE (Tss_SalInvoice_Dt.SiSalInvoice_Hd=Tss_SalFactor_Dt.SiSalInvoice_HdRow) AND (Tss_SalInvoice_Dt.SiPubGoods = Tss_SalFactor_Dt.SiPubGoods)) FeeOneMeterVaragh,
+	(SELECT Tss_SalInvoice_Dt.Num_OneMeterBoxPrice FROM	Tss_SalInvoice_Dt WHERE	(Tss_SalInvoice_Dt.SiSalInvoice_Hd=Tss_SalFactor_Dt.SiSalInvoice_HdRow) AND (Tss_SalInvoice_Dt.SiPubGoods = Tss_SalFactor_Dt.SiPubGoods)) FeeOneMeterBox,
+	Tss_SalFactor_Dt.Num_FactDetGoodsNo*Tss_SalFactor_Dt.Num_FactDetGoodsFee AS TotalRow, 
+	--dbo.Tss_SalFactorPriceUdf(3, Tss_SalFactor_Hd.SiSalFactor_Hd, NULL) AS TotalRow, 
+	$0.0 AS SrvPrc, 
+	$0.0 AS AllPrc, 
+	$0.0 AS KeliSaleSrvPrc, 
+	$0.0 AS HamlSrvPrc, 
+	$0.0 AS GhalebProdSrvPrc, 
+	$0.0 AS ZincFilmSrvPrc, 
+	$0.0 AS ZincChapKeliSrvPrc, 
+	$0.0 AS KeliSakhtSrvPrc, 
+	$0.0 AS Shahrdari2SrvPrc, 
+	$0.0 AS ArzeshAf2SrvPrc, 
+	$0.0 AS ArzeshAf4SrvPrc, 
+	$0.0 AS HamloBarbariSrvPrc, 
+	$0.0 AS TarahiSrvPrc, 
+	$0.0 AS AlalTarrahiPrc, 
+	$0.0 AS AlalSakhteGhalebPrc, 
+	$0.0 AS HaftDarsadeAlalKeliPrc, 
+	$0.0 AS MakharejeTaghribiTarhshakhtKeliPrc, 
+	$0.0 AS KasreMAliatPrc, 
+	$0.0 AS HazinehTarahiSrvPrc,	
+	dbo.Tss_SalFindGdsGramage(Tss_SalFactor_Dt.SiPubGoods) as OneGdsGramage,
+	dbo.Tss_SalFindGdsGramage(Tss_SalFactor_Dt.SiPubGoods)*Tss_SalFactor_Dt.Num_FactDetGoodsNo as FactorWeight,
+	dbo.Tss_SalFindGdsFlutType(Tss_SalFactor_Dt.SiPubGoods) GdsFluteType,
+	len(dbo.Tss_SalFindGdsFlutType(Tss_SalFactor_Dt.SiPubGoods)) GdsFluteTypeLen,
+	dbo.Tss_SalFindGdsArea(Tss_SalFactor_Dt.SiPubGoods) as OneGdsArea,
+	dbo.Tss_SalFindGdsArea(Tss_SalFactor_Dt.SiPubGoods)*Tss_SalFactor_Dt.Num_FactDetGoodsNo as FactorArea,
+	dbo.Tss_SalFindAddedCostsForContract(Tss_SalInvoice_HdViw.SiSalInvoice_Hd,Tss_SalFactor_Dt.SiPubGoods,0)*Tss_SalFactor_Dt.Num_FactDetGoodsNo as ColorCost,
+	dbo.Tss_SalFindAddedCostsForContract(Tss_SalInvoice_HdViw.SiSalInvoice_Hd,Tss_SalFactor_Dt.SiPubGoods,1)*Tss_SalFactor_Dt.Num_FactDetGoodsNo as HamlCost,
+	dbo.Tss_SalFindAddedCostsForContract(Tss_SalInvoice_HdViw.SiSalInvoice_Hd,Tss_SalFactor_Dt.SiPubGoods,2)*Tss_SalFactor_Dt.Num_FactDetGoodsNo as PalleteCost,
+	(SELECT top 1 Num_GdsFee FROM Tss_SalInvoice_Dt WHERE (SiSalInvoice_Hd = Tss_SalFactor_Hd.SiSalInvoice_Hd) AND (SiPubGoods = Tss_SalFactor_Dt.SiPubGoods)) as Num_GdsFee,
+	(SELECT top 1 Num_FeeAdjust FROM Tss_SalInvoice_Dt WHERE (SiSalInvoice_Hd = Tss_SalFactor_Hd.SiSalInvoice_Hd) AND (SiPubGoods = Tss_SalFactor_Dt.SiPubGoods)) as Num_FeeAdjust, 
+	(SELECT top 1 Num_FeeAdjust FROM Tss_SalInvoice_Dt WHERE (SiSalInvoice_Hd = Tss_SalFactor_Hd.SiSalInvoice_Hd) AND (SiPubGoods = Tss_SalFactor_Dt.SiPubGoods))*Tss_SalFactor_Dt.Num_FactDetGoodsNo as TotalDiscount, 
+	Tss_SalTypeOfSales.Cod_SalTypeCode, 
+	Tss_SalTypeOfSales.Des_SalTypeDesc,
+	Tss_SalInvoice_HdViw.Cod_LetterNo,
+    Tss_SalFactor_Hd.irtaxid,
+    Tss_SalFactor_Hd.Taxid,
+    Tss_SalFactor_Hd.referenceNumber,
+    Tss_SalFactor_Hd.uid,
+    Tss_SalFactor_Hd.Sta_FactorType,
+    Tss_SalFactor_Hd.Sta_CurrencyType,
+    Tss_SalFactor_Hd.Num_CurrencyRate,
+    Tss_SalFactor_Hd.CottageNo,
+    Tss_SalFactor_Hd.CottageDate,
+    Tss_SalFactor_Hd.Num_CottageTotWeight,
+    Tss_SalFactor_Hd.CustomsCode,
+    Tss_SalFactor_Hd.SiSalFactor_HdRef,
+    RefFactor.Cod_FactorCode AS RefFactorCde, 
+    RefFactor.Dat_FactorDate AS RefFactorDate,
+	dbo.HexToDec(SUBSTRING(Tss_SalFactor_Hd.taxid, 12, 10)) AS Taxdecimal_value,
+	RefFactor.Dat_FactorDate as FactorDateRef,
+	RefFactor.Cod_FactorCode as FactorCodeRef,	
+	Tss_SalFactor_Hd.Sta_TaxFalg,
+	Tss_SalFactor_Hd.Sta_TasviehType,
+	dbo.Tss_StdStaLabelsUdf(1131, Tss_SalFactor_Hd.Sta_TasviehType) as Sta_TasviehTypeDesc,
+	isnull((Select Des_RowDesc From dbo.Tss_SalInvoice_Dt Where (SiSalInvoice_Hd = Tss_SalFactor_Hd.SiSalInvoice_Hd) and (SiPubGoods = Tss_SalFactor_Dt.SiPubGoods)),'''') ContDes_RowDesc  
+	into  
+		'+@TblName+'
+
+FROM  Tss_SalFactor_Hd AS RefFactor RIGHT OUTER JOIN
+                         Tss_SalFactor_Dt INNER JOIN
+                         Tss_SalFactor_Hd AS Tss_SalFactor_Hd ON Tss_SalFactor_Dt.SiSalFactor_Hd = Tss_SalFactor_Hd.SiSalFactor_Hd INNER JOIN
+                         Tss_PubPersonsSpec AS Cust ON Tss_SalFactor_Hd.SiPubPersonsSpec = Cust.SiPubPersonsSpec INNER JOIN
+                         Tss_PubSubLocations ON Tss_SalFactor_Hd.SiPubSubLocations = Tss_PubSubLocations.SiPubSubLocations ON RefFactor.SiSalFactor_Hd = Tss_SalFactor_Hd.SiSalFactor_HdRef LEFT OUTER JOIN
+                         Tss_SalGdsRecieptToFactor AS Tss_SalGdsRecieptToFactor_1 ON Tss_SalFactor_Hd.SiSalFactor_Hd = Tss_SalGdsRecieptToFactor_1.SiSalFactor_Hd LEFT OUTER JOIN
+                         Tss_SalTypeOfSales ON Tss_SalFactor_Hd.SiSalTypeOfFactor = Tss_SalTypeOfSales.SiSalTypeOfSales LEFT OUTER JOIN
+                         Tss_PubPersonsViw AS Saler ON Cust.SiPerRelatedSaler = Saler.SiPubPersonsSpec LEFT OUTER JOIN
+                         Tss_SalInvoice_HdViw ON Tss_SalFactor_Hd.SiSalInvoice_Hd = Tss_SalInvoice_HdViw.SiSalInvoice_Hd LEFT OUTER JOIN
+                         Tss_AccVoucher_Hd INNER JOIN
+                         Tss_AccVoucher_Dt ON Tss_AccVoucher_Hd.SiAccVoucher_Hd = Tss_AccVoucher_Dt.SiAccVoucher_Hd ON Tss_SalFactor_Hd.SiAccVoucher_Dt = Tss_AccVoucher_Dt.SiAccVoucher_Dt LEFT OUTER JOIN
+                         Tss_PubCustomCodesViw AS Srv ON Tss_SalFactor_Dt.SiPubCustomCodes = Srv.SiPubCustomDataType LEFT OUTER JOIN
+                         Tss_PubGoodsViw AS Gds ON Tss_SalFactor_Dt.SiPubGoods = Gds.SiPubGoods'
+
+if (isnull(@startdate,'')<>'') and (isnull(@EndDate,'')<>'')
+Set @SqlTxt= @SqlTxt +
+' where	Tss_SalFactor_Hd.Dat_FactorDate between '+''''+@StartDate+''''+' and '+''''+@EndDate+''''+''
+
+if isnull(@FlgMoadianFacts,0)=0
+    Set @SqlTxt= @SqlTxt + ' and  Tss_SalFactor_Hd.SiSalFactor_Hd not in (SELECT SiSalFactor_HdRef FROM Tss_SalFactor_Hd WHERE (Sta_FactorHdState = 2)) '
+
+print @SqlTxt
+
+If isnull(@SiSelected,0)>0
+Begin
+   If @FlgSelected=0
+      Exec (@SqlTxt+' and Tss_SalFactor_Hd.SiSalInvoice_Hd in ('+@SiSelected+')')
+   If @FlgSelected=1
+      Exec (@SqlTxt+' and Tss_SalFactor_Hd.SiPubPersonsSpec in ('+@SiSelected+')')
+   If @FlgSelected=2
+      Exec (@SqlTxt+' and Tss_SalFactor_Dt.SiPubGoods in ('+@SiSelected+')')
+End
+Else
+   Exec (@SqlTxt)
+
+print 'Select * From
+(
+   Select * From
+   (
+   SELECT  *  FROM '+@TblName+' ) Ccc  '+@InternalWhere+'
+) CalcSel ' + @Where + @Order
+
+Exec(
+'Select * From
+(
+   Select * From
+ (
+   SELECT  *  FROM '+@TblName+' ) Ccc  '+@InternalWhere+'
+) CalcSel ' + @Where + @Order)
+
+
+IF OBJECT_ID(@TblName, 'U') IS NOT NULL
+begin
+	Set @SqlTxt1='Drop Table '+@TblName
+	Exec(@SqlTxt1)
+end
+
+GO
