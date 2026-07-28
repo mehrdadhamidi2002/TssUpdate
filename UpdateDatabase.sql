@@ -1,4 +1,4 @@
--- Create version tracking table if it doesn't exist
+ï»¿-- Create version tracking table if it doesn't exist
 IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[DBVersion]') AND type in (N'U'))
 BEGIN
     CREATE TABLE DBVersion (
@@ -876,7 +876,7 @@ Else
 
 	Set @SiEmpDutyDocs=Scope_Identity()
 
-------------------------------------------------ÏÑÌ ÏÑ ãÍÇÓÈå ãÇãæÑíÊ------------------------------------------------------
+------------------------------------------------Ø¯Ø±Ø¬ Ø¯Ø± Ù…Ø­Ø§Ø³Ø¨Ù‡ Ù…Ø§Ù…ÙˆØ±ÙŠØª------------------------------------------------------
 	Declare 
 		@SiGenDate numeric,
 		@DutyDate VarChar(10),
@@ -1002,7 +1002,7 @@ Else
 	Close DutyDates
 	Deallocate DutyDates
 
-------------------------------------------------ÏÑÌ ÏÑ ãÍÇÓÈå ãÇãæÑíÊ------------------------------------------------------
+------------------------------------------------Ø¯Ø±Ø¬ Ø¯Ø± Ù…Ø­Ø§Ø³Ø¨Ù‡ Ù…Ø§Ù…ÙˆØ±ÙŠØª------------------------------------------------------
 
 	If IsNull(@SiEmpDutyDocs,0)=0
 	Begin
@@ -1039,7 +1039,7 @@ Begin
 			Num_OverDutyHoliday=@Num_OverDutyHoliday
 		Where (SiEmpDutyDocs=@SiEmpDutyDocs)
 
-------------------------------------------------ÏÑÌ ÏÑ ãÍÇÓÈå ãÇãæÑíÊ-------------------------------------
+------------------------------------------------Ø¯Ø±Ø¬ Ø¯Ø± Ù…Ø­Ø§Ø³Ø¨Ù‡ Ù…Ø§Ù…ÙˆØ±ÙŠØª-------------------------------------
 	Declare DutyDates Cursor For
 	SELECT SiGenDates,Dat_GenShamsiDate FROM Tss_GenDates 
 	WHERE (Dat_GenShamsiDate BETWEEN @Dat_DutyStartDate AND @Dat_DutyEndedDate)
@@ -1220,7 +1220,7 @@ Begin
 	Close DutyDates
 	Deallocate DutyDates
 
-------------------------------------------------ÏÑÌ ÏÑ ãÍÇÓÈå ãÇãæÑíÊ-------------------------------------
+------------------------------------------------Ø¯Ø±Ø¬ Ø¯Ø± Ù…Ø­Ø§Ø³Ø¨Ù‡ Ù…Ø§Ù…ÙˆØ±ÙŠØª-------------------------------------
 		Set @Err_Code=@@Error
 		If @Err_Code<>0
 			Set @Err_Code=401
@@ -1246,7 +1246,7 @@ Begin
 				Where  SiEmpDutyDocs=@SiEmpDutyDocs
 		Delete From dbo.Tss_EmpDutyDocs
 		Where (SiEmpDutyDocs=@SiEmpDutyDocs)
-------------------------------------------------ÍĞİ ãÍÇÓÈå ãÇãæÑíÊ-------------------------------------
+------------------------------------------------Ø­Ø°Ù Ù…Ø­Ø§Ø³Ø¨Ù‡ Ù…Ø§Ù…ÙˆØ±ÙŠØª-------------------------------------
 Declare DutyDates Cursor For
 	SELECT SiGenDates,Dat_GenShamsiDate FROM Tss_GenDates 
 	WHERE (Dat_GenShamsiDate BETWEEN @Dat_DutyStartDate AND @Dat_DutyEndedDate)
@@ -1304,7 +1304,7 @@ Declare DutyDates Cursor For
 	Close DutyDates
 	Deallocate DutyDates
 
-------------------------------------------------ÍĞİ ãÍÇÓÈå ãÇãæÑíÊ-------------------------------------
+------------------------------------------------Ø­Ø°Ù Ù…Ø­Ø§Ø³Ø¨Ù‡ Ù…Ø§Ù…ÙˆØ±ÙŠØª-------------------------------------
 		Set @Err_Code=@@Error
 		If @Err_Code<>0
 			Set @Err_Code=4000
@@ -1480,7 +1480,7 @@ select distinct SiSel from dbo.Tss_StdStringSiFindUdf(@SiPubPersonsSpec) order b
 			Deallocate nn
 		End
 ---------------------------------------------------------------------------------------------------------------------------------------
-		------------------------------------------------ÏÑÌ ÏÑ ãÍÇÓÈå ãÑÎÕí------------------------------------------------------
+		------------------------------------------------Ø¯Ø±Ø¬ Ø¯Ø± Ù…Ø­Ø§Ø³Ø¨Ù‡ Ù…Ø±Ø®ØµÙŠ------------------------------------------------------
 			Declare 
 				@SiGenDate numeric,
 				@LeaveDate VarChar(10),
@@ -1503,7 +1503,7 @@ select distinct SiSel from dbo.Tss_StdStringSiFindUdf(@SiPubPersonsSpec) order b
 				@SiGenDate,
 				@LeaveDate
 
-				print 'ãä ÇíäÌÇããããããããããããããããã'
+				print 'Ù…Ù† Ø§ÙŠÙ†Ø¬Ø§Ù…Ù…Ù…Ù…Ù…Ù…Ù…Ù…Ù…Ù…Ù…Ù…Ù…Ù…Ù…Ù…Ù…'
 			
 			While @@Fetch_Status=0
 			Begin
@@ -1537,7 +1537,7 @@ select distinct SiSel from dbo.Tss_StdStringSiFindUdf(@SiPubPersonsSpec) order b
 			Close LeaveDates
 			Deallocate LeaveDates
 		
-		------------------------------------------------ÏÑÌ ÏÑ ãÍÇÓÈå ãÑÎÕí------------------------------------------------------
+		------------------------------------------------Ø¯Ø±Ø¬ Ø¯Ø± Ù…Ø­Ø§Ø³Ø¨Ù‡ Ù…Ø±Ø®ØµÙŠ------------------------------------------------------
 			If IsNull(@SiEmpLeaveDocs,0)=0
 			Begin
 				Set @SiEmpLeaveDocs=0
@@ -1640,7 +1640,7 @@ print 'ok'
 			Deallocate nn
 		End*/
 ---------------------------------------------------------------------------------------------------------------------------------------
-		------------------------------------------------ÏÑÌ ÏÑ ãÍÇÓÈå ãÑÎÕí------------------------------------------------------
+		------------------------------------------------Ø¯Ø±Ø¬ Ø¯Ø± Ù…Ø­Ø§Ø³Ø¨Ù‡ Ù…Ø±Ø®ØµÙŠ------------------------------------------------------
 			set @LeaveAmt=0			
 
 			Declare LeaveDates Cursor For
@@ -1685,7 +1685,7 @@ print 'ok'
 			End
 			Close LeaveDates
 			Deallocate LeaveDates
-		------------------------------------------------ÏÑÌ ÏÑ ãÍÇÓÈå ãÑÎÕí------------------------------------------------------
+		------------------------------------------------Ø¯Ø±Ø¬ Ø¯Ø± Ù…Ø­Ø§Ø³Ø¨Ù‡ Ù…Ø±Ø®ØµÙŠ------------------------------------------------------
 		Set @Err_Code=@@Error
 		If @Err_Code<>0
 			Set @Err_Code=401
@@ -1711,7 +1711,7 @@ Begin
 				Where  SiEmpLeaveDocs=@SiEmpLeaveDocs
 		Delete From dbo.Tss_EmpLeaveDocs
 		Where (SiEmpLeaveDocs=@SiEmpLeaveDocs)
-------------------------------------------------ÍĞİ ãÍÇÓÈå ãÑÎÕí-------------------------------------
+------------------------------------------------Ø­Ø°Ù Ù…Ø­Ø§Ø³Ø¨Ù‡ Ù…Ø±Ø®ØµÙŠ-------------------------------------
 	Declare LeaveDates Cursor For
 	SELECT SiGenDates,Dat_GenShamsiDate FROM Tss_GenDates 
 	WHERE (Dat_GenShamsiDate BETWEEN @Dat_LeaveStartDate AND @Dat_LevaEndedDate)
@@ -1769,7 +1769,7 @@ Begin
 	Close LeaveDates
 	Deallocate LeaveDates
 
-------------------------------------------------ÍĞİ ãÍÇÓÈå ãÑÎÕí-------------------------------------
+------------------------------------------------Ø­Ø°Ù Ù…Ø­Ø§Ø³Ø¨Ù‡ Ù…Ø±Ø®ØµÙŠ-------------------------------------
 		Set @Err_Code=@@Error
 		If @Err_Code<>0
 			Set @Err_Code=4000
@@ -1874,7 +1874,7 @@ Else
 
 	Set @SiEmpDutyDocs=Scope_Identity()
 
-------------------------------------------------ÏÑÌ ÏÑ ãÍÇÓÈå ãÇãæÑíÊ------------------------------------------------------
+------------------------------------------------Ø¯Ø±Ø¬ Ø¯Ø± Ù…Ø­Ø§Ø³Ø¨Ù‡ Ù…Ø§Ù…ÙˆØ±ÙŠØª------------------------------------------------------
 	Declare 
 		@SiGenDate numeric,
 		@DutyDate VarChar(10),
@@ -2000,7 +2000,7 @@ Else
 	Close DutyDates
 	Deallocate DutyDates
 
-------------------------------------------------ÏÑÌ ÏÑ ãÍÇÓÈå ãÇãæÑíÊ------------------------------------------------------
+------------------------------------------------Ø¯Ø±Ø¬ Ø¯Ø± Ù…Ø­Ø§Ø³Ø¨Ù‡ Ù…Ø§Ù…ÙˆØ±ÙŠØª------------------------------------------------------
 
 	If IsNull(@SiEmpDutyDocs,0)=0
 	Begin
@@ -2037,7 +2037,7 @@ Begin
 			Num_OverDutyHoliday=@Num_OverDutyHoliday
 		Where (SiEmpDutyDocs=@SiEmpDutyDocs)
 
-------------------------------------------------ÏÑÌ ÏÑ ãÍÇÓÈå ãÇãæÑíÊ-------------------------------------
+------------------------------------------------Ø¯Ø±Ø¬ Ø¯Ø± Ù…Ø­Ø§Ø³Ø¨Ù‡ Ù…Ø§Ù…ÙˆØ±ÙŠØª-------------------------------------
 	Declare DutyDates Cursor For
 	SELECT SiGenDates,Dat_GenShamsiDate FROM Tss_GenDates 
 	WHERE (Dat_GenShamsiDate BETWEEN @Dat_DutyStartDate AND @Dat_DutyEndedDate)
@@ -2218,7 +2218,7 @@ Begin
 	Close DutyDates
 	Deallocate DutyDates
 
-------------------------------------------------ÏÑÌ ÏÑ ãÍÇÓÈå ãÇãæÑíÊ-------------------------------------
+------------------------------------------------Ø¯Ø±Ø¬ Ø¯Ø± Ù…Ø­Ø§Ø³Ø¨Ù‡ Ù…Ø§Ù…ÙˆØ±ÙŠØª-------------------------------------
 		Set @Err_Code=@@Error
 		If @Err_Code<>0
 			Set @Err_Code=401
@@ -2244,7 +2244,7 @@ Begin
 				Where  SiEmpDutyDocs=@SiEmpDutyDocs
 		Delete From dbo.Tss_EmpDutyDocs
 		Where (SiEmpDutyDocs=@SiEmpDutyDocs)
-------------------------------------------------ÍĞİ ãÍÇÓÈå ãÇãæÑíÊ-------------------------------------
+------------------------------------------------Ø­Ø°Ù Ù…Ø­Ø§Ø³Ø¨Ù‡ Ù…Ø§Ù…ÙˆØ±ÙŠØª-------------------------------------
 Declare DutyDates Cursor For
 	SELECT SiGenDates,Dat_GenShamsiDate FROM Tss_GenDates 
 	WHERE (Dat_GenShamsiDate BETWEEN @Dat_DutyStartDate AND @Dat_DutyEndedDate)
@@ -2302,7 +2302,7 @@ Declare DutyDates Cursor For
 	Close DutyDates
 	Deallocate DutyDates
 
-------------------------------------------------ÍĞİ ãÍÇÓÈå ãÇãæÑíÊ-------------------------------------
+------------------------------------------------Ø­Ø°Ù Ù…Ø­Ø§Ø³Ø¨Ù‡ Ù…Ø§Ù…ÙˆØ±ÙŠØª-------------------------------------
 		Set @Err_Code=@@Error
 		If @Err_Code<>0
 			Set @Err_Code=4000
@@ -2403,7 +2403,7 @@ Begin
 		End
 		Else
 		Begin
-			------------------------------------------------ÏÑÌ ÏÑ ãÍÇÓÈå ÇÖÇİåßÇÑí------------------------------------------------------
+			------------------------------------------------Ø¯Ø±Ø¬ Ø¯Ø± Ù…Ø­Ø§Ø³Ø¨Ù‡ Ø§Ø¶Ø§ÙÙ‡â€ŒÙƒØ§Ø±ÙŠ------------------------------------------------------
 			-- NEW: work out, from this person's work-time record on the
 			-- overtime date, how many minutes of the requested overtime
 			-- window [@Num_OverStartTime, @Num_OverEndTime] fall before
@@ -2465,7 +2465,7 @@ Begin
 				Num_ValidOverAfterDoc = @CalcValidOverAfterDoc,
 				Num_ValidOverInHoliday = @CalcValidOverInHoliday
 			Where SiEmpOverTimeAllowDoc = @SiEmpOverTimeAllowDoc
-			------------------------------------------------ÏÑÌ ÏÑ ãÍÇÓÈå ÇÖÇİåßÇÑí------------------------------------------------------
+			------------------------------------------------Ø¯Ø±Ø¬ Ø¯Ø± Ù…Ø­Ø§Ø³Ø¨Ù‡ Ø§Ø¶Ø§ÙÙ‡â€ŒÙƒØ§Ø±ÙŠ------------------------------------------------------
 		End
 	
 		Delete From @PerTable where SiPer=@SiSelected
@@ -2918,7 +2918,7 @@ SELECT
     Tss_PubGoods.Des_PubGoodsDesc, Tss_PubGoodsClassify.Cod_GoodsClassCode AS Code_Jens, Tss_PubGoodsClassify.Des_GoodsClassDesc AS Name_Jens, 
     Tss_PrcKelisheSpec.Cod_KelisheSpecCode, 
     Tss_PrcKelisheSpec.Des_KelisheSpecDesc, Tsid.SiPrcDieSpec, Tss_PrcDieSpec.Cod_DieSpecCode, 
-    Tss_PrcDieSpec.Des_DieSpecDesc+'+''''+' - '+''''+'+convert(varchar,Tss_PrcDieSpec.Num_NoGdsInDie)+'+''''+' ÊÇíí '+''''+' as Des_DieSpecDesc,
+    Tss_PrcDieSpec.Des_DieSpecDesc+'+''''+' - '+''''+'+convert(varchar,Tss_PrcDieSpec.Num_NoGdsInDie)+'+''''+' ØªØ§ÙŠÙŠ '+''''+' as Des_DieSpecDesc,
     Tsid.Sta_Cyan, Tsid.Sta_Magenta, Tsid.Sta_Yellow, Tsid.Sta_Black, Tsid.Sta_HasVerni, Tsid.Num_VaraghCreaseAmt, 
     Tsid.Sta_HoleSide, Tsid.Sta_CatchSide, Tsid.Sta_PrintArm, Tsid.Sta_PackType, 
     Tsid.Num_OneMeterSheetPrice, Tsid.Num_OneMeterBoxPrice, Tsid.SiPubCustomCodes, Tsid.Cod_SampleGdsCode, 
@@ -3395,7 +3395,7 @@ SELECT
     Tss_PubGoods.Des_PubGoodsDesc, Tss_PubGoodsClassify.Cod_GoodsClassCode AS Code_Jens, Tss_PubGoodsClassify.Des_GoodsClassDesc AS Name_Jens, 
     Tss_PrcKelisheSpec.Cod_KelisheSpecCode, 
     Tss_PrcKelisheSpec.Des_KelisheSpecDesc, Tsid.SiPrcDieSpec, Tss_PrcDieSpec.Cod_DieSpecCode, 
-    Tss_PrcDieSpec.Des_DieSpecDesc+'+''''+' - '+''''+'+convert(varchar,Tss_PrcDieSpec.Num_NoGdsInDie)+'+''''+' ÊÇíí '+''''+' as Des_DieSpecDesc,
+    Tss_PrcDieSpec.Des_DieSpecDesc+'+''''+' - '+''''+'+convert(varchar,Tss_PrcDieSpec.Num_NoGdsInDie)+'+''''+' ØªØ§ÙŠÙŠ '+''''+' as Des_DieSpecDesc,
     Tsid.Sta_Cyan, Tsid.Sta_Magenta, Tsid.Sta_Yellow, Tsid.Sta_Black, Tsid.Sta_HasVerni, Tsid.Num_VaraghCreaseAmt, 
     Tsid.Sta_HoleSide, Tsid.Sta_CatchSide, Tsid.Sta_PrintArm, Tsid.Sta_PackType, 
     Tsid.Num_OneMeterSheetPrice, Tsid.Num_OneMeterBoxPrice, Tsid.SiPubCustomCodes, Tsid.Cod_SampleGdsCode, 
@@ -3818,7 +3818,7 @@ BEGIN
             Tss_PubGoodsClassify.Des_GoodsClassDesc AS Name_Jens,
             Tss_PrcKelisheSpec.Cod_KelisheSpecCode, Tss_PrcKelisheSpec.Des_KelisheSpecDesc,
 Tsid.SiPrcDieSpec, Tss_PrcDieSpec.Cod_DieSpecCode,
-            Tss_PrcDieSpec.Des_DieSpecDesc + N'' - '' + CONVERT(VARCHAR, Tss_PrcDieSpec.Num_NoGdsInDie) + N'' ÊÇíí '' AS Des_DieSpecDesc,
+            Tss_PrcDieSpec.Des_DieSpecDesc + N'' - '' + CONVERT(VARCHAR, Tss_PrcDieSpec.Num_NoGdsInDie) + N'' ØªØ§ÙŠÙŠ '' AS Des_DieSpecDesc,
             Tsid.Sta_Cyan, Tsid.Sta_Magenta, Tsid.Sta_Yellow, Tsid.Sta_Black, Tsid.Sta_HasVerni,
             Tsid.Num_VaraghCreaseAmt, Tsid.Sta_HoleSide, Tsid.Sta_CatchSide, Tsid.Sta_PrintArm,
             Tsid.Sta_PackType, Tsid.Num_OneMeterSheetPrice, Tsid.Num_OneMeterBoxPrice,
@@ -3940,7 +3940,7 @@ Tsid.SiPrcDieSpec, Tss_PrcDieSpec.Cod_DieSpecCode,
                 Tss_PubGoodsClassify.Des_GoodsClassDesc AS Name_Jens,
                 Tss_PrcKelisheSpec.Cod_KelisheSpecCode, Tss_PrcKelisheSpec.Des_KelisheSpecDesc,
                 Tsid.SiPrcDieSpec, Tss_PrcDieSpec.Cod_DieSpecCode,
-                Tss_PrcDieSpec.Des_DieSpecDesc + N'' - '' + CONVERT(VARCHAR, Tss_PrcDieSpec.Num_NoGdsInDie) + N'' ÊÇíí '' AS Des_DieSpecDesc,
+                Tss_PrcDieSpec.Des_DieSpecDesc + N'' - '' + CONVERT(VARCHAR, Tss_PrcDieSpec.Num_NoGdsInDie) + N'' ØªØ§ÙŠÙŠ '' AS Des_DieSpecDesc,
                 Tsid.Sta_Cyan, Tsid.Sta_Magenta, Tsid.Sta_Yellow, Tsid.Sta_Black, Tsid.Sta_HasVerni,
                 Tsid.Num_VaraghCreaseAmt, Tsid.Sta_HoleSide, Tsid.Sta_CatchSide, Tsid.Sta_PrintArm,
                 Tsid.Sta_PackType, Tsid.Num_OneMeterSheetPrice, Tsid.Num_OneMeterBoxPrice,
@@ -5131,5 +5131,851 @@ begin
 	Set @SqlTxt1='Drop Table '+@TblName
 	Exec(@SqlTxt1)
 end
+
+GO
+
+alter Procedure Tss_RapPayedChequePardakhtiVchRegStp
+(
+	@RapType SmallInt=0,
+   @SiAccFinancePeriod Numeric=Null, 
+   @SiPubSubLocations Numeric=Null,
+   @Des_VhedDesc VarChar(500)='',
+   @Des_VhedDescDet VarChar(500)='',
+   @SiResid VarChar(8000)='',
+	@SiResidDet Numeric=Null,
+	@SiTafBed Numeric=Null,
+	@SiTafBes Numeric=Null,
+   @SiAccCodeBookBed Numeric=Null,
+   @SiAccCodeBookBes Numeric=Null,
+	@UserIP varchar(50),
+	@WindosUser varchar(200),
+	@SiUser numeric
+)
+as
+
+Declare
+   @Dat_VhedDate VarChar(10),
+   @SiAccVoucher_Hd Numeric,
+   @SiAccVoucher_Dt Numeric,
+   @SiAccVoucherType Numeric,
+   @SiTbl Int,
+	@SiResidRap Numeric, 
+	@SiPersBed Numeric, 
+	@SiPersBes Numeric, 
+	@DatRegister VarChar(10),
+	@CodSerial Varchar(50), 
+	@DatEndDate VarChar(10),
+	@CodParaSanad VarChar(2),
+	@Err_Code Int,
+	@SiTbl2 int, 
+	@SiAccBed Numeric, 
+	@SiAccBes Numeric, 
+	@BabatDesc VarChar(500),
+	@SiChqRef Numeric,
+	@GbzAmount Numeric, 
+	@SiRef Numeric,
+	@RefState SmallInt,
+   @SiAccFinancePeriodToPlace Numeric,
+   @Det_Row Int,
+   @Des_VdetDesc Varchar(5000),
+	@AllAmount Numeric,
+	@PerNameBed VarChar(500),
+	@PerNameBes VarChar(500),
+	@Sta_TafType1 smallint,
+	@SiVchDtBes Numeric,
+	@Sta_RapPayedChequeState smallint
+
+
+SELECT @Sta_TafType1=Sta_TafType1 FROM dbo.Tss_AccCodeBook WHERE (SiAccCodeBook = @SiAccCodeBookBed)
+
+SELECT 
+	@SiAccFinancePeriodToPlace=SiAccFinancePeriodToPlace
+FROM
+	dbo.Tss_AccFinancePeriodToPlace
+WHERE     
+	(SiAccFinancePeriod = @SiAccFinancePeriod) AND 
+	(SiPubSubLocations = @SiPubSubLocations)
+
+If @RapType=0
+	Set @CodParaSanad='12'
+
+SELECT @SiAccVoucherType=SiAccVoucherType FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 5)
+
+If IsNull(@SiAccVoucherType,0)=0
+Begin
+	Set @Err_Code=1
+	Return
+End
+Declare
+   @TempVchTbl Table 
+	(
+		SiTbl int identity(1,1), 
+		SiResidRap Numeric, 
+		SiPersBed Numeric, 
+		SiPersBes Numeric, 
+		DatRegister VarChar(10),
+		CodSerial Varchar(50), 
+		DatEndDate VarChar(10),
+		Sta_RapPayedChequeState smallint
+	)
+
+Declare
+   @TempVchTbl2 Table 
+	(
+		SiTbl2 int identity(1,1), 
+		SiAccBed Numeric, 
+		SiAccBes Numeric, 
+		BabatDesc VarChar(500),
+		SiChqRef Numeric,
+		GbzAmount Numeric, 
+		SiRef Numeric,
+		RefState SmallInt
+	)
+
+Insert Into @TempVchTbl
+(
+	SiResidRap,
+	SiPersBed,
+	SiPersBes,
+	DatRegister,
+	CodSerial,
+	DatEndDate,
+	Sta_RapPayedChequeState
+)
+SELECT     
+	dbo.Tss_RapPayedCheque.SiRapPayedCheque, 
+	dbo.Tss_RapChequesDefine.SiPubPersonsSpec SiPerBed,
+	dbo.Tss_RapPayedCheque.SiPubPersonsSpec AS SiPerBes, 
+	dbo.Tss_RapPayedCheque.Dat_RapPayedChequeRegDate, 
+	dbo.Tss_RapPayedCheque.Cod_RapPayedChequeSerial, 
+	dbo.Tss_RapPayedCheque.Dat_RapPayedChequeEndDate,
+	dbo.Tss_RapPayedCheque.Sta_RapPayedChequeState
+FROM         
+	dbo.Tss_RapPayedCheque INNER JOIN dbo.Tss_RapChequesDefine ON 
+	dbo.Tss_RapPayedCheque.SiRapChequesDefine = dbo.Tss_RapChequesDefine.SiRapChequesDefine INNER JOIN
+	dbo.Tss_PubPersonsSpec ON dbo.Tss_RapChequesDefine.SiPubPersonsSpec = dbo.Tss_PubPersonsSpec.SiPubPersonsSpec
+WHERE     
+	(dbo.Tss_RapPayedCheque.SiRapPayedCheque IN (SELECT SiSel FROM dbo.Tss_StdStringSiFindUdf(@SiResid) Tss_StdStringSiFindUdf))
+
+select * from @TempVchTbl
+
+if @Sta_TafType1=0
+Begin
+	While Exists(Select Top 1 SiTbl From @TempVchTbl)
+	Begin
+		Set @AllAmount=0
+		Select Top 1
+			@SiTbl=SiTbl,
+			@SiResidRap=SiResidRap,
+			@SiPersBed=SiPersBed,
+			@SiPersBes=SiPersBes,
+			@DatRegister=DatRegister,
+			@CodSerial=CodSerial,
+			@DatEndDate=DatEndDate,
+			@Sta_RapPayedChequeState=Sta_RapPayedChequeState
+		From @TempVchTbl
+		Set @SiPersBed=@SiTafBed
+		Set @SiAccVoucher_Hd=0
+		Set @Dat_VhedDate=@DatRegister
+		SELECT @SiAccVoucher_Hd=SiAccVoucher_Hd FROM dbo.Tss_AccVoucher_Hd
+		Where
+			(SiAccVoucherType=@SiAccVoucherType) And
+			(Dat_VhedDate=@DatRegister) And
+			(SiAccFinancePeriodToPlace=@SiAccFinancePeriodToPlace)
+		Set @SiAccVoucher_Hd=IsNull(@SiAccVoucher_Hd,0)
+		If @SiAccVoucher_Hd=0
+		Begin
+			Exec dbo.Tss_AccVouchHedRegStp
+			   @SiAccFinancePeriodToPlace,
+				@SiAccVoucherType,
+			   @Dat_VhedDate,
+			   @Des_VhedDesc,
+				@SiAccVoucher_Hd  OutPut
+			If IsNull(@SiAccVoucher_Hd,0)=0
+				Exec dbo.Tss_StdInsertLogData @SiAccVoucher_Hd,'Tss_AccVoucher_Hd',@UserIP,@WindosUser,0,@SiUser
+			If IsNull(@SiAccVoucher_Hd,0)=0
+			Begin
+				Set @Err_Code=2
+				Return
+			End
+		End
+	   Select @Det_Row=Max(IsNull(Num_VDetRow,0))+1 FROM Tss_AccVoucher_Dt WHERE (SiAccVoucher_Hd = @SiAccVoucher_Hd) 
+		if isnull(@Det_Row,0)=0
+			Set @Det_Row=1
+		Insert Into  @TempVchTbl2
+		(
+			SiAccBed,
+			SiAccBes,
+			BabatDesc,
+			SiChqRef,
+			GbzAmount,
+			SiRef,
+			RefState
+		)
+		SELECT     
+			Behalf.SiAccCodeBookBehalfBed, 
+			Behalf.SiAccCodeBookBehalfBes, 
+			Behalf.Des_RapBehalfDesc, 
+			ChqPayRef.SiRapPayedChequeRef, 
+			ChqPayRef.Num_RapPayedChequeRefAmount, 
+			ChqPayRef.SiRapPayedChequeRef_Refrence,
+			RefDef.Sta_RapRefrenceDefType
+		FROM         
+			Tss_RapBehalfDefine Behalf INNER JOIN Tss_RapPayedChequeRef ChqPayRef ON 
+			Behalf.SiRapBehalfDefine = ChqPayRef.SiRapBehalfDefine LEFT OUTER JOIN Tss_RapRefrenceDefine RefDef ON 
+			Behalf.SiRapRefrenceDefine = RefDef.SiRapRefrenceDefine
+		WHERE
+			(ChqPayRef.SiRapPayedCheque=@SiResidRap)
+
+		SELECT @GbzAmount=Num_RapPayedChequeRefAmount FROM Tss_RapPayedChequeRef WHERE (SiRapPayedChequeRef = @SiResidDet)	
+
+		if @SiAccCodeBookBed>0 
+			Set @SiAccBed=@SiAccCodeBookBed
+		if @SiAccCodeBookBes>0 
+			Set @SiAccBes=@SiAccCodeBookBes
+
+		SELECT     @PerNameBed=Des_FullName
+		FROM         Tss_PubPersonsViw
+		WHERE     (SiPubPersonsSpec = @SiPersBed)
+
+		SELECT     @PerNameBes=Des_FullName
+		FROM         Tss_PubPersonsViw
+		WHERE     (SiPubPersonsSpec = @SiPersBes)
+
+		Set @SiPersBes=@SiTafBes
+		
+		if Exists (SELECT SiAccVoucher_Dt FROM Tss_RapPayedChequeRef WHERE (SiRapPayedCheque = @SiResid) And (SiAccVoucher_Dt is not null) )
+			Select @SiVchDtBes=SiAccVoucher_Dt From dbo.Tss_AccVoucher_Dt where SiAccVoucher_Dt in 
+			(SELECT SiAccVoucher_Dt FROM Tss_RapPayedChequeRef WHERE (SiRapPayedCheque = @SiResid)) and 
+			(Num_VdetCreditAmount>0) and (Num_VdetAmount>0)
+		if Not Exists (SELECT SiAccVoucher_Dt FROM Tss_RapPayedChequeRef WHERE (SiRapPayedCheque = @SiResid) And (SiAccVoucher_Dt is not null) )
+		Begin
+			Set @Des_VdetDesc=' ØµØ¯ÙˆØ± Ú†Ú© Ø´Ù…Ø§Ø±Ù‡  '+@CodSerial+' Ø¨Ù‡ ØªØ§Ø±ÛŒØ® Ø³Ø±Ø±Ø³ÛŒØ¯ '+@DatEndDate + ' '+@Des_VhedDescDet
+			--Set @Des_VdetDesc=@Des_VhedDescDet
+			Insert Into  dbo.Tss_AccVoucher_Dt
+			(
+	         SiAccCodeBook, 
+	         SiPubPersonsSpec1, 
+	         SiAccVoucher_Hd, 
+	         Num_VDetRow, 
+	         Des_VdetDesc, 
+	         Dat_AccVoucherDetDate, 
+	         Sta_VdetDebtOrCredit, 
+	         Num_VdetDebtAmount, 
+	         Num_VdetCreditAmount, 
+	         Num_VdetAmount,
+				SiRelatedSenderSerial,
+				Des_RelatedTableSender
+			)
+			Values
+			(
+	         @SiAccBed, 
+	         @SiTafBed, 
+	         @SiAccVoucher_Hd, 
+	         @Det_Row, 
+	         @Des_VdetDesc, 
+	         @DatRegister, 
+	         0, 
+	         @GbzAmount, 
+	         0, 
+	         @GbzAmount,
+				@SiResidRap,
+				'Tss_RapPayedCheque'
+			)
+
+	      Set @SiAccVoucher_Dt=Scope_Identity()
+			Exec dbo.Tss_StdInsertLogData @SiAccVoucher_Dt,'Tss_AccVoucher_Dt',@UserIP,@WindosUser,0,@SiUser
+			
+		  if @Sta_RapPayedChequeState =0 
+	      Update dbo.Tss_RapPayedChequeRef Set SiAccVoucher_Dt=@SiAccVoucher_Dt Where (SiRapPayedCheque=@SiResidRap)
+
+		  if @Sta_RapPayedChequeState =1 
+	      Update dbo.Tss_RapPayedChequeRef Set SiVchDtForBardasht=@SiAccVoucher_Dt Where (SiRapPayedCheque=@SiResidRap)
+
+	      Set @Det_Row=@Det_Row+1
+
+			Delete From @TempVchTbl2 Where (SiTbl2=@SiTbl2)
+
+			Set @Des_VdetDesc=' ØµØ¯ÙˆØ± Ú†Ú© Ø´Ù…Ø§Ø±Ù‡  '+@CodSerial+' Ø¨Ù‡ ØªØ§Ø±ÛŒØ® Ø³Ø±Ø±Ø³ÛŒØ¯ '+@DatEndDate + ' '+@Des_VhedDescDet
+
+			Insert Into  dbo.Tss_AccVoucher_Dt
+			(
+		      SiAccCodeBook, 
+		      SiPubPersonsSpec1, 
+		      SiAccVoucher_Hd, 
+		      Num_VDetRow, 
+		      Des_VdetDesc, 
+		      Dat_AccVoucherDetDate, 
+		      Sta_VdetDebtOrCredit, 
+		      Num_VdetDebtAmount, 
+		      Num_VdetCreditAmount, 
+		      Num_VdetAmount,
+				SiRelatedSenderSerial,
+				Des_RelatedTableSender
+			)
+			Values
+			(
+		      @SiAccBes, 
+		      @SiTafBes, 
+		      @SiAccVoucher_Hd, 
+		      @Det_Row, 
+		      @Des_VdetDesc, 
+		      @DatRegister, 
+		      1, 
+		      0, 
+		    	@GbzAmount, 
+		      @GbzAmount,
+				@SiResidRap,
+				'Tss_RapPayedCheque'
+			)
+	      Set @SiAccVoucher_Dt=Scope_Identity()
+			Exec dbo.Tss_StdInsertLogData @SiAccVoucher_Dt,'Tss_AccVoucher_Dt',@UserIP,@WindosUser,0,@SiUser
+
+		  if @Sta_RapPayedChequeState =0 
+	      Update dbo.Tss_RapPayedChequeRef Set SiAccVoucher_Dt=@SiAccVoucher_Dt Where (SiRapPayedCheque=@SiResidRap)
+
+		  if @Sta_RapPayedChequeState =1 
+	      Update dbo.Tss_RapPayedChequeRef Set SiVchDtForBardasht=@SiAccVoucher_Dt Where (SiRapPayedCheque=@SiResidRap)
+
+		End
+		Else
+		Begin
+			Set @Des_VdetDesc=' ØµØ¯ÙˆØ± Ú†Ú© Ø´Ù…Ø§Ø±Ù‡  '+@CodSerial+' Ø¨Ù‡ ØªØ§Ø±ÛŒØ® Ø³Ø±Ø±Ø³ÛŒØ¯ '+@DatEndDate + ' '+@Des_VhedDescDet
+--			Set @Des_VdetDesc=@Des_VhedDescDet
+			Insert Into  dbo.Tss_AccVoucher_Dt
+			(
+	         SiAccCodeBook, 
+	         SiPubPersonsSpec1, 
+	         SiAccVoucher_Hd, 
+	         Num_VDetRow, 
+	         Des_VdetDesc, 
+	         Dat_AccVoucherDetDate, 
+	         Sta_VdetDebtOrCredit, 
+	         Num_VdetDebtAmount, 
+	         Num_VdetCreditAmount, 
+	         Num_VdetAmount,
+				SiRelatedSenderSerial,
+				Des_RelatedTableSender
+			)
+			Values
+			(
+	         @SiAccBed, 
+	         @SiTafBed, 
+	         @SiAccVoucher_Hd, 
+	         @Det_Row, 
+	         @Des_VdetDesc, 
+	         @DatRegister, 
+	         0, 
+	         @GbzAmount, 
+	         0, 
+	         @GbzAmount,
+				@SiResidRap,
+				'Tss_RapPayedCheque'
+			)
+
+	      Set @SiAccVoucher_Dt=Scope_Identity()
+			Exec dbo.Tss_StdInsertLogData @SiAccVoucher_Dt,'Tss_AccVoucher_Dt',@UserIP,@WindosUser,0,@SiUser
+
+		  if @Sta_RapPayedChequeState =0 
+	      Update dbo.Tss_RapPayedChequeRef Set SiAccVoucher_Dt=@SiAccVoucher_Dt Where (SiRapPayedCheque=@SiResidRap)
+
+		  if @Sta_RapPayedChequeState =1 
+	      Update dbo.Tss_RapPayedChequeRef Set SiVchDtForBardasht=@SiAccVoucher_Dt Where (SiRapPayedCheque=@SiResidRap)
+
+
+	      Set @Det_Row=@Det_Row+1
+
+			Delete From @TempVchTbl2 Where (SiTbl2=@SiTbl2)
+			--Set @Des_VdetDesc=' Ù¾Ø±Ø¯Ø§Ø®Øª Ú†Ú© Ø´Ù…Ø§Ø±Ù‡ '+@CodSerial+' Ø¨Ù‡ '+@PerNameBes+ ' Ø¨Ø§Ø¨Øª '+@Des_VhedDescDet
+
+			Update dbo.Tss_AccVoucher_Dt 
+			Set Num_VdetCreditAmount=Num_VdetCreditAmount+@GbzAmount , Num_VdetAmount=Num_VdetAmount+@GbzAmount
+			Where SiAccVoucher_Dt=@SiVchDtBes
+		End
+		Delete From @TempVchTbl Where (SiTbl=@SiTbl)
+	End
+	Delete @TempVchTbl
+	Delete @TempVchTbl2
+End	
+
+
+
+if @Sta_TafType1=1
+Begin
+	While Exists(Select Top 1 SiTbl From @TempVchTbl)
+	Begin
+		Set @AllAmount=0
+		Select Top 1
+			@SiTbl=SiTbl,
+			@SiResidRap=SiResidRap,
+			@SiPersBed=SiPersBed,
+			@SiPersBes=SiPersBes,
+			@DatRegister=DatRegister,
+			@CodSerial=CodSerial,
+			@DatEndDate=DatEndDate,
+			@Sta_RapPayedChequeState=Sta_RapPayedChequeState
+		From @TempVchTbl
+		Set @SiPersBed=@SiTafBed
+		Set @SiAccVoucher_Hd=0
+		Set @Dat_VhedDate=@DatRegister
+		SELECT @SiAccVoucher_Hd=SiAccVoucher_Hd FROM dbo.Tss_AccVoucher_Hd
+		Where
+			(SiAccVoucherType=@SiAccVoucherType) And
+			(Dat_VhedDate=@DatRegister) And
+			(SiAccFinancePeriodToPlace=@SiAccFinancePeriodToPlace)
+		Set @SiAccVoucher_Hd=IsNull(@SiAccVoucher_Hd,0)
+		If @SiAccVoucher_Hd=0
+		Begin
+			Exec dbo.Tss_AccVouchHedRegStp
+			   @SiAccFinancePeriodToPlace,
+				@SiAccVoucherType,
+			   @Dat_VhedDate,
+			   @Des_VhedDesc,
+				@SiAccVoucher_Hd  OutPut
+			If not IsNull(@SiAccVoucher_Hd,0)=0
+				Exec dbo.Tss_StdInsertLogData @SiAccVoucher_Hd,'Tss_AccVoucher_Hd',@UserIP,@WindosUser,0,@SiUser
+			If IsNull(@SiAccVoucher_Hd,0)=0
+			Begin
+				Set @Err_Code=2
+				Return
+			End
+		End
+	   Select @Det_Row=Max(IsNull(Num_VDetRow,0))+1 FROM Tss_AccVoucher_Dt WHERE (SiAccVoucher_Hd = @SiAccVoucher_Hd) 
+		if isnull(@Det_Row,0)=0
+			Set @Det_Row=1
+		Insert Into  @TempVchTbl2
+		(
+			SiAccBed,
+			SiAccBes,
+			BabatDesc,
+			SiChqRef,
+			GbzAmount,
+			SiRef,
+			RefState
+		)
+		SELECT     
+			Behalf.SiAccCodeBookBehalfBed, 
+			Behalf.SiAccCodeBookBehalfBes, 
+			Behalf.Des_RapBehalfDesc, 
+			ChqPayRef.SiRapPayedChequeRef, 
+			ChqPayRef.Num_RapPayedChequeRefAmount, 
+			ChqPayRef.SiRapPayedChequeRef_Refrence,
+			RefDef.Sta_RapRefrenceDefType
+		FROM         
+			Tss_RapBehalfDefine Behalf INNER JOIN Tss_RapPayedChequeRef ChqPayRef ON 
+			Behalf.SiRapBehalfDefine = ChqPayRef.SiRapBehalfDefine LEFT OUTER JOIN Tss_RapRefrenceDefine RefDef ON 
+			Behalf.SiRapRefrenceDefine = RefDef.SiRapRefrenceDefine
+		WHERE
+			(ChqPayRef.SiRapPayedCheque=@SiResidRap)
+
+		SELECT @GbzAmount=Num_RapPayedChequeRefAmount FROM Tss_RapPayedChequeRef WHERE (SiRapPayedChequeRef = @SiResidDet)	
+
+		if @SiAccCodeBookBed>0 
+			Set @SiAccBed=@SiAccCodeBookBed
+		if @SiAccCodeBookBes>0 
+			Set @SiAccBes=@SiAccCodeBookBes
+
+		SELECT     @PerNameBed=Des_FullName
+		FROM         Tss_PubPersonsViw
+		WHERE     (SiPubPersonsSpec = @SiPersBed)
+
+		SELECT     @PerNameBes=Des_FullName
+		FROM         Tss_PubPersonsViw
+		WHERE     (SiPubPersonsSpec = @SiPersBes)
+
+		Set @SiPersBes=@SiTafBes
+
+		if Exists (SELECT SiAccVoucher_Dt FROM Tss_RapPayedChequeRef WHERE (SiRapPayedCheque = @SiResid) And (SiAccVoucher_Dt is not null) )
+			Select @SiVchDtBes=SiAccVoucher_Dt From dbo.Tss_AccVoucher_Dt where SiAccVoucher_Dt in 
+			(SELECT SiAccVoucher_Dt FROM Tss_RapPayedChequeRef WHERE (SiRapPayedCheque = @SiResid)) and 
+			(Num_VdetCreditAmount>0) and (Num_VdetAmount>0)
+		if Not Exists (SELECT SiAccVoucher_Dt FROM Tss_RapPayedChequeRef WHERE (SiRapPayedCheque = @SiResid) And (SiAccVoucher_Dt is not null) )
+		Begin
+			Set @Des_VdetDesc=' ØµØ¯ÙˆØ± Ú†Ú© Ø´Ù…Ø§Ø±Ù‡  '+@CodSerial+' Ø¨Ù‡ ØªØ§Ø±ÛŒØ® Ø³Ø±Ø±Ø³ÛŒØ¯ '+@DatEndDate + ' '+@Des_VhedDescDet
+--			Set @Des_VdetDesc= @Des_VhedDescDet
+			Insert Into  dbo.Tss_AccVoucher_Dt
+			(
+	         SiAccCodeBook, 
+	         SiPubPersonsSpec1, 
+	         SiAccVoucher_Hd, 
+	         Num_VDetRow, 
+	         Des_VdetDesc, 
+	         Dat_AccVoucherDetDate, 
+	         Sta_VdetDebtOrCredit, 
+	         Num_VdetDebtAmount, 
+	         Num_VdetCreditAmount, 
+	         Num_VdetAmount,
+				SiRelatedSenderSerial,
+				Des_RelatedTableSender
+			)
+			Values
+			(
+	         @SiAccBed, 
+	         @SiTafBed, 
+	         @SiAccVoucher_Hd, 
+	         @Det_Row, 
+	         @Des_VdetDesc, 
+	         @DatRegister, 
+	         0, 
+	         @GbzAmount, 
+	         0, 
+	         @GbzAmount,
+				@SiResidRap,
+				'Tss_RapPayedCheque'
+			)
+	      Set @SiAccVoucher_Dt=Scope_Identity()
+			Exec dbo.Tss_StdInsertLogData @SiAccVoucher_Dt,'Tss_AccVoucher_Dt',@UserIP,@WindosUser,0,@SiUser
+
+		  if @Sta_RapPayedChequeState =0 
+	      Update dbo.Tss_RapPayedChequeRef Set SiAccVoucher_Dt=@SiAccVoucher_Dt Where (SiRapPayedCheque=@SiResidRap)
+
+		  if @Sta_RapPayedChequeState =1 
+	      Update dbo.Tss_RapPayedChequeRef Set SiVchDtForBardasht=@SiAccVoucher_Dt Where (SiRapPayedCheque=@SiResidRap)
+
+	      Set @Det_Row=@Det_Row+1
+
+			Delete From @TempVchTbl2 Where (SiTbl2=@SiTbl2)
+
+			Set @Des_VdetDesc=' ØµØ¯ÙˆØ± Ú†Ú© Ø´Ù…Ø§Ø±Ù‡  '+@CodSerial+' Ø¨Ù‡ ØªØ§Ø±ÛŒØ® Ø³Ø±Ø±Ø³ÛŒØ¯ '+@DatEndDate + ' '+' Ø¯Ø± ÙˆØ¬Ù‡ '+@PerNameBed + ' '+@Des_VhedDescDet
+
+			Insert Into  dbo.Tss_AccVoucher_Dt
+			(
+		      SiAccCodeBook, 
+		      SiPubPersonsSpec1, 
+		      SiAccVoucher_Hd, 
+		      Num_VDetRow, 
+		      Des_VdetDesc, 
+		      Dat_AccVoucherDetDate, 
+		      Sta_VdetDebtOrCredit, 
+		      Num_VdetDebtAmount, 
+		      Num_VdetCreditAmount, 
+		      Num_VdetAmount,
+				SiRelatedSenderSerial,
+				Des_RelatedTableSender
+			)
+			Values
+			(
+		      @SiAccBes, 
+		      @SiTafBes, 
+		      @SiAccVoucher_Hd, 
+		      @Det_Row, 
+		      @Des_VdetDesc, 
+		      @DatRegister, 
+		      1, 
+		      0, 
+		    	@GbzAmount, 
+		      @GbzAmount,
+				@SiResidRap,
+				'Tss_RapPayedCheque'
+			)
+
+	      Set @SiAccVoucher_Dt=Scope_Identity()
+			Exec dbo.Tss_StdInsertLogData @SiAccVoucher_Dt,'Tss_AccVoucher_Dt',@UserIP,@WindosUser,0,@SiUser
+
+		  if @Sta_RapPayedChequeState =0 
+	      Update dbo.Tss_RapPayedChequeRef Set SiAccVoucher_Dt=@SiAccVoucher_Dt Where (SiRapPayedCheque=@SiResidRap)
+
+		  if @Sta_RapPayedChequeState =1 
+	      Update dbo.Tss_RapPayedChequeRef Set SiVchDtForBardasht=@SiAccVoucher_Dt Where (SiRapPayedCheque=@SiResidRap)
+		End
+		Else
+		Begin
+			Set @Des_VdetDesc=' ØµØ¯ÙˆØ± Ú†Ú© Ø´Ù…Ø§Ø±Ù‡  '+@CodSerial+' Ø¨Ù‡ ØªØ§Ø±ÛŒØ® Ø³Ø±Ø±Ø³ÛŒØ¯ '+@DatEndDate + ' '+@Des_VhedDescDet
+--			Set @Des_VdetDesc= @Des_VhedDescDet
+			Insert Into  dbo.Tss_AccVoucher_Dt
+			(
+	         SiAccCodeBook, 
+	         SiPubPersonsSpec1, 
+	         SiAccVoucher_Hd, 
+	         Num_VDetRow, 
+	         Des_VdetDesc, 
+	         Dat_AccVoucherDetDate, 
+	         Sta_VdetDebtOrCredit, 
+	         Num_VdetDebtAmount, 
+	         Num_VdetCreditAmount, 
+	         Num_VdetAmount,
+				SiRelatedSenderSerial,
+				Des_RelatedTableSender
+			)
+			Values
+			(
+	         @SiAccBed, 
+	         @SiTafBed, 
+	         @SiAccVoucher_Hd, 
+	         @Det_Row, 
+	         @Des_VdetDesc, 
+	         @DatRegister, 
+	         0, 
+	         @GbzAmount, 
+	         0, 
+	         @GbzAmount,
+				@SiResidRap,
+				'Tss_RapPayedCheque'
+			)
+
+	      Set @SiAccVoucher_Dt=Scope_Identity()
+			Exec dbo.Tss_StdInsertLogData @SiAccVoucher_Dt,'Tss_AccVoucher_Dt',@UserIP,@WindosUser,0,@SiUser
+
+		  if @Sta_RapPayedChequeState =0 
+	      Update dbo.Tss_RapPayedChequeRef Set SiAccVoucher_Dt=@SiAccVoucher_Dt Where (SiRapPayedCheque=@SiResidRap)
+
+		  if @Sta_RapPayedChequeState =1 
+	      Update dbo.Tss_RapPayedChequeRef Set SiVchDtForBardasht=@SiAccVoucher_Dt Where (SiRapPayedCheque=@SiResidRap)
+
+	      Set @Det_Row=@Det_Row+1
+
+			Delete From @TempVchTbl2 Where (SiTbl2=@SiTbl2)
+			--Set @Des_VdetDesc=' Ù¾Ø±Ø¯Ø§Ø®Øª Ú†Ú© Ø´Ù…Ø§Ø±Ù‡ '+@CodSerial+' Ø¨Ù‡ '+@PerNameBes+ ' Ø¨Ø§Ø¨Øª '+@Des_VhedDescDet
+
+			Update dbo.Tss_AccVoucher_Dt 
+			Set Num_VdetCreditAmount=Num_VdetCreditAmount+@GbzAmount , Num_VdetAmount=Num_VdetAmount+@GbzAmount
+			Where SiAccVoucher_Dt=@SiVchDtBes
+		End
+		Delete From @TempVchTbl Where (SiTbl=@SiTbl)
+	End
+	Delete @TempVchTbl
+	Delete @TempVchTbl2
+End	
+	
+	
+if @Sta_TafType1=2
+Begin
+	While Exists(Select Top 1 SiTbl From @TempVchTbl)
+	Begin
+		Set @AllAmount=0
+		Select Top 1
+			@SiTbl=SiTbl,
+			@SiResidRap=SiResidRap,
+			@SiPersBed=SiPersBed,
+			@SiPersBes=SiPersBes,
+			@DatRegister=DatRegister,
+			@CodSerial=CodSerial,
+			@DatEndDate=DatEndDate
+		From @TempVchTbl
+		Set @SiPersBed=@SiTafBed
+		Set @SiAccVoucher_Hd=0
+		Set @Dat_VhedDate=@DatRegister
+		SELECT @SiAccVoucher_Hd=SiAccVoucher_Hd FROM dbo.Tss_AccVoucher_Hd
+		Where
+			(SiAccVoucherType=@SiAccVoucherType) And
+			(Dat_VhedDate=@DatRegister) And
+			(SiAccFinancePeriodToPlace=@SiAccFinancePeriodToPlace)
+		Set @SiAccVoucher_Hd=IsNull(@SiAccVoucher_Hd,0)
+		If @SiAccVoucher_Hd=0
+		Begin
+			Exec dbo.Tss_AccVouchHedRegStp
+			   @SiAccFinancePeriodToPlace,
+				@SiAccVoucherType,
+			   @Dat_VhedDate,
+			   @Des_VhedDesc,
+				@SiAccVoucher_Hd  OutPut
+			If not IsNull(@SiAccVoucher_Hd,0)=0
+				Exec dbo.Tss_StdInsertLogData @SiAccVoucher_Hd,'Tss_AccVoucher_Hd',@UserIP,@WindosUser,0,@SiUser
+			If IsNull(@SiAccVoucher_Hd,0)=0
+			Begin
+				Set @Err_Code=2
+				Return
+			End
+		End
+	   Select @Det_Row=Max(IsNull(Num_VDetRow,0))+1 FROM Tss_AccVoucher_Dt WHERE (SiAccVoucher_Hd = @SiAccVoucher_Hd) 
+		if isnull(@Det_Row,0)=0
+			Set @Det_Row=1
+		Insert Into  @TempVchTbl2
+		(
+			SiAccBed,
+			SiAccBes,
+			BabatDesc,
+			SiChqRef,
+			GbzAmount,
+			SiRef,
+			RefState
+		)
+		SELECT     
+			Behalf.SiAccCodeBookBehalfBed, 
+			Behalf.SiAccCodeBookBehalfBes, 
+			Behalf.Des_RapBehalfDesc, 
+			ChqPayRef.SiRapPayedChequeRef, 
+			ChqPayRef.Num_RapPayedChequeRefAmount, 
+			ChqPayRef.SiRapPayedChequeRef_Refrence,
+			RefDef.Sta_RapRefrenceDefType
+		FROM         
+			Tss_RapBehalfDefine Behalf INNER JOIN Tss_RapPayedChequeRef ChqPayRef ON 
+			Behalf.SiRapBehalfDefine = ChqPayRef.SiRapBehalfDefine LEFT OUTER JOIN Tss_RapRefrenceDefine RefDef ON 
+			Behalf.SiRapRefrenceDefine = RefDef.SiRapRefrenceDefine
+		WHERE
+			(ChqPayRef.SiRapPayedCheque=@SiResidRap)
+	
+		SELECT @GbzAmount=Num_RapPayedChequeRefAmount FROM Tss_RapPayedChequeRef WHERE (SiRapPayedChequeRef = @SiResidDet)	
+
+		if @SiAccCodeBookBed>0 
+			Set @SiAccBed=@SiAccCodeBookBed
+		if @SiAccCodeBookBes>0 
+			Set @SiAccBes=@SiAccCodeBookBes
+
+		SELECT @PerNameBed=Des_CostCenterName
+		FROM Tss_PubCostCenter
+		WHERE (SiPubCostCenter = @SiTafBed)
+
+		SELECT     @PerNameBes=Des_FullName
+		FROM         Tss_PubPersonsViw
+		WHERE     (SiPubPersonsSpec = @SiPersBes)
+
+		Set @SiPersBes=@SiTafBes
+
+		if Exists (SELECT SiAccVoucher_Dt FROM Tss_RapPayedChequeRef WHERE (SiRapPayedCheque = @SiResid) And (SiAccVoucher_Dt is not null) )
+			Select @SiVchDtBes=SiAccVoucher_Dt From dbo.Tss_AccVoucher_Dt where SiAccVoucher_Dt in 
+			(SELECT SiAccVoucher_Dt FROM Tss_RapPayedChequeRef WHERE (SiRapPayedCheque = @SiResid)) and 
+			(Num_VdetCreditAmount>0) and (Num_VdetAmount>0)
+	
+		if Not Exists (SELECT SiAccVoucher_Dt FROM Tss_RapPayedChequeRef WHERE (SiRapPayedCheque = @SiResid) And (SiAccVoucher_Dt is not null) )
+		Begin
+			--' ØµØ¯ÙˆØ± Ú†Ú© Ø´Ù…Ø§Ø±Ù‡  '+@CodSerial+' Ø¬Ù‡Øª Ù…Ø±Ú©Ø² Ù‡Ø²ÙŠÙ†Ù‡ '+@PerNameBed+' ' +
+			Set @Des_VdetDesc=' ØµØ¯ÙˆØ± Ú†Ú© Ø´Ù…Ø§Ø±Ù‡  '+@CodSerial+' Ø¨Ù‡ ØªØ§Ø±ÛŒØ® Ø³Ø±Ø±Ø³ÛŒØ¯ '+@DatEndDate + ' '+@Des_VhedDescDet
+--			Set @Des_VdetDesc=@Des_VhedDescDet
+			Insert Into  dbo.Tss_AccVoucher_Dt
+			(
+	         SiAccCodeBook, 
+	         SiPubCostCenter1, 
+	         SiAccVoucher_Hd, 
+	         Num_VDetRow, 
+	         Des_VdetDesc, 
+	         Dat_AccVoucherDetDate, 
+	         Sta_VdetDebtOrCredit, 
+	         Num_VdetDebtAmount, 
+	         Num_VdetCreditAmount, 
+	         Num_VdetAmount,
+				SiRelatedSenderSerial,
+				Des_RelatedTableSender
+			)
+			Values
+			(
+	         @SiAccBed, 
+	         @SiTafBed, 
+	         @SiAccVoucher_Hd, 
+	         @Det_Row, 
+	         @Des_VdetDesc, 
+	         @DatRegister, 
+	         0, 
+	         @GbzAmount, 
+	         0, 
+	         @GbzAmount,
+				@SiResidRap,
+				'Tss_RapPayedCheque'
+			)
+	      Set @SiAccVoucher_Dt=Scope_Identity()
+			Exec dbo.Tss_StdInsertLogData @SiAccVoucher_Dt,'Tss_AccVoucher_Dt',@UserIP,@WindosUser,0,@SiUser
+
+		  if @Sta_RapPayedChequeState =0 
+	      Update dbo.Tss_RapPayedChequeRef Set SiAccVoucher_Dt=@SiAccVoucher_Dt Where (SiRapPayedCheque=@SiResidRap)
+
+		  if @Sta_RapPayedChequeState =1 
+	      Update dbo.Tss_RapPayedChequeRef Set SiVchDtForBardasht=@SiAccVoucher_Dt Where (SiRapPayedCheque=@SiResidRap)
+
+	      Set @Det_Row=@Det_Row+1
+
+			Delete From @TempVchTbl2 Where (SiTbl2=@SiTbl2)
+		--End
+		if @PerNameBes = 'Ø¹Ù…ÙˆÙ…ÙŠ'
+			Set @Des_VdetDesc=' ØµØ¯ÙˆØ± Ú†Ú© Ø´Ù…Ø§Ø±Ù‡  '+@CodSerial+' Ø¨Ù‡ ØªØ§Ø±ÛŒØ® Ø³Ø±Ø±Ø³ÛŒØ¯ '+@DatEndDate + ' '+@Des_VhedDescDet
+		else
+			Set @Des_VdetDesc=' ØµØ¯ÙˆØ± Ú†Ú© Ø´Ù…Ø§Ø±Ù‡  '+@CodSerial++' Ø¯Ø± ÙˆØ¬Ù‡ '+@PerNameBes+' Ø¨Ù‡ ØªØ§Ø±ÛŒØ® Ø³Ø±Ø±Ø³ÛŒØ¯ '+@DatEndDate + ' '+@Des_VhedDescDet
+
+			Insert Into  dbo.Tss_AccVoucher_Dt
+			(
+		      SiAccCodeBook, 
+		      SiPubPersonsSpec1, 
+		      SiAccVoucher_Hd, 
+		      Num_VDetRow, 
+		      Des_VdetDesc, 
+		      Dat_AccVoucherDetDate, 
+		      Sta_VdetDebtOrCredit, 
+		      Num_VdetDebtAmount, 
+		      Num_VdetCreditAmount, 
+		      Num_VdetAmount,
+				SiRelatedSenderSerial,
+				Des_RelatedTableSender
+			)
+			Values
+			(
+		      @SiAccBes, 
+		      @SiTafBes, 
+		      @SiAccVoucher_Hd, 
+		      @Det_Row, 
+		      @Des_VdetDesc, 
+		      @DatRegister, 
+		      1, 
+		      0, 
+		      @GbzAmount, 
+		      @GbzAmount,
+				@SiResidRap,
+				'Tss_RapPayedCheque'
+			)
+
+	      Set @SiAccVoucher_Dt=Scope_Identity()
+			Exec dbo.Tss_StdInsertLogData @SiAccVoucher_Dt,'Tss_AccVoucher_Dt',@UserIP,@WindosUser,0,@SiUser
+
+		  if @Sta_RapPayedChequeState =0 
+	      Update dbo.Tss_RapPayedChequeRef Set SiAccVoucher_Dt=@SiAccVoucher_Dt Where (SiRapPayedCheque=@SiResidRap)
+
+		  if @Sta_RapPayedChequeState =1 
+	      Update dbo.Tss_RapPayedChequeRef Set SiVchDtForBardasht=@SiAccVoucher_Dt Where (SiRapPayedCheque=@SiResidRap)
+	End
+	Else
+	Begin
+		Set @Des_VdetDesc=' ØµØ¯ÙˆØ± Ú†Ú© Ø´Ù…Ø§Ø±Ù‡  '+@CodSerial+' Ø¨Ù‡ ØªØ§Ø±ÛŒØ® Ø³Ø±Ø±Ø³ÛŒØ¯ '+@DatEndDate + ' '+@Des_VhedDescDet
+		Insert Into  dbo.Tss_AccVoucher_Dt
+		(
+         SiAccCodeBook, 
+         SiPubCostCenter1, 
+         SiAccVoucher_Hd, 
+         Num_VDetRow, 
+         Des_VdetDesc, 
+         Dat_AccVoucherDetDate, 
+         Sta_VdetDebtOrCredit, 
+         Num_VdetDebtAmount, 
+         Num_VdetCreditAmount, 
+         Num_VdetAmount,
+			SiRelatedSenderSerial,
+			Des_RelatedTableSender
+		)
+		Values
+		(
+         @SiAccBed, 
+         @SiTafBed, 
+         @SiAccVoucher_Hd, 
+         @Det_Row, 
+         @Des_VdetDesc, 
+         @DatRegister, 
+         0, 
+         @GbzAmount, 
+         0, 
+         @GbzAmount,
+			@SiResidRap,
+			'Tss_RapPayedCheque'
+		)
+
+      Set @SiAccVoucher_Dt=Scope_Identity()
+		Exec dbo.Tss_StdInsertLogData @SiAccVoucher_Dt,'Tss_AccVoucher_Dt',@UserIP,@WindosUser,0,@SiUser
+
+		  if @Sta_RapPayedChequeState =0 
+	      Update dbo.Tss_RapPayedChequeRef Set SiAccVoucher_Dt=@SiAccVoucher_Dt Where (SiRapPayedCheque=@SiResidRap)
+
+		  if @Sta_RapPayedChequeState =1 
+	      Update dbo.Tss_RapPayedChequeRef Set SiVchDtForBardasht=@SiAccVoucher_Dt Where (SiRapPayedCheque=@SiResidRap)
+
+      Set @Det_Row=@Det_Row+1
+
+		Delete From @TempVchTbl2 Where (SiTbl2=@SiTbl2)
+		--Set @Des_VdetDesc=' Ù¾Ø±Ø¯Ø§Ø®Øª Ú†Ú© Ø´Ù…Ø§Ø±Ù‡  '+@CodSerial+' Ø¨Ù‡ '+@PerNameBes+ ' Ø¨Ø§Ø¨Øª '+@Des_VhedDescDet
+
+		Update dbo.Tss_AccVoucher_Dt 
+			Set Num_VdetCreditAmount=Num_VdetCreditAmount+@GbzAmount , Num_VdetAmount=Num_VdetAmount+@GbzAmount
+			Where SiAccVoucher_Dt=@SiVchDtBes
+	End
+		Delete From @TempVchTbl Where (SiTbl=@SiTbl)
+	End
+	Delete @TempVchTbl
+	Delete @TempVchTbl2
+End
 
 GO
