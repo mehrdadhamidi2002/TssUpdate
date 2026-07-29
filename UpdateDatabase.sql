@@ -7431,3 +7431,264 @@ Exists(
 End
 
 Go
+
+alter proc Tss_InvPaperVaredehRepDtStp
+(
+	@SiInvEntrance_Hd Numeric=235
+)
+As
+
+DECLARE 
+	@RialiAmt NUMERIC, @WeightSum NUMERIC, @RoleNoSum NUMERIC, @Des_InvEntDetailDesc varchar(500), @Des_PubUnitDesc varchar(50), @Cod_PubGoodsCode varchar(50), 
+	@Des_PubGoodsDesc varchar(500), @SiInvEntranceHd NUMERIC, @SiPubGoods numeric, @Gramage numeric, @Width numeric  ,
+	@Des_BarnamehNo varchar(500),
+	@Des_HavalehNo varchar(500),
+	@Des_VehicleNo varchar(500),
+	@Num_ResidOriginWeight NUMERIC,
+	@Num_FactoryBascule NUMERIC,
+	@Num_BasculeDiff NUMERIC,
+	@Num_TransportCost NUMERIC,
+	@Cod_invEntDetailCode varchar(50),
+	@Num_Serial Decimal(21,0)
+Declare 
+	@TempTable table 
+	(RialiAmt numeric, WeightSum NUMERIC, RoleNoSum NUMERIC, Des_InvEntDetailDesc varchar(500), Des_PubUnitDesc varchar(50), Cod_PubGoodsCode varchar(50), 
+	Des_PubGoodsDesc varchar(500), SiInvEntranceHd NUMERIC, SiPubGoods numeric, DesPubGoodsDesc varchar(500),Gramage numeric, Width numeric,
+	Des_BarnamehNo varchar(500),
+	Des_HavalehNo varchar(500),
+	Des_VehicleNo varchar(500),
+	Num_ResidOriginWeight NUMERIC,
+	Num_FactoryBascule NUMERIC,
+	Num_BasculeDiff NUMERIC,
+	Num_TransportCost NUMERIC,
+	Cod_invEntDetailCode varchar(50),
+	Num_Serial Decimal(21,0)
+	)
+
+SELECT     
+	@Des_BarnamehNo = Des_BarnamehNo, 
+	@Des_HavalehNo = Des_HavalehNo, 
+	@Des_VehicleNo = Des_VehicleNo, 
+	@Num_ResidOriginWeight = Num_ResidOriginWeight, 
+	@Num_FactoryBascule = Num_FactoryBascule, 
+	@Num_BasculeDiff = Num_BasculeDiff, 
+	@Num_TransportCost = Num_TransportCost
+FROM         
+	Tss_InvEntrance_Hd
+WHERE     
+	(SiInvEntrance_Hd = @SiInvEntrance_Hd)
+
+Declare 
+	@DesPubGoodsDesc1 varchar(50),
+	@DesPubGoodsDesc2 varchar(50),
+	@DesPubGoodsDesc3 varchar(50),
+	@DesPubGoodsDesc4 varchar(50),
+	@DesPubGoodsDesc varchar(50)
+
+Set	@DesPubGoodsDesc1 = ''
+Set	@DesPubGoodsDesc2 = ''
+Set	@DesPubGoodsDesc3 = ''
+Set	@DesPubGoodsDesc4 = ''
+Set	@DesPubGoodsDesc = ''
+
+if dbo.Tss_StdFindSubLoc(0)<>'zarin'
+DECLARE EntranceDt CURSOR FOR 
+SELECT
+	SUM(dbo.Tss_InvEntrance_Dt.Num_VaredehRialiAmt) As RialiAmt,     
+	SUM(dbo.Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount) AS WeightSum, 
+	SUM(dbo.Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount2) AS RoleNoSum, 
+	dbo.Tss_InvEntrance_Dt.Des_InvEntDetailDesc, 
+	dbo.Tss_PubUnitSpecs.Des_PubUnitDesc, 
+	dbo.Tss_PubGoods.Cod_PubGoodsCode, 
+	dbo.Tss_PubGoods.Des_PubGoodsDesc, 
+	dbo.Tss_InvEntrance_Dt.SiInvEntrance_Hd, 
+	dbo.Tss_InvEntrance_Dt.SiPubGoods,
+	dbo.Tss_InvEntrance_Dt.Cod_invEntDetailCode,
+	dbo.Tss_InvEntrance_Dt.Num_Serial
+FROM         
+	dbo.Tss_InvEntrance_Dt INNER JOIN dbo.Tss_PubGoods ON 
+	dbo.Tss_InvEntrance_Dt.SiPubGoods = dbo.Tss_PubGoods.SiPubGoods LEFT OUTER JOIN dbo.Tss_PubUnitSpecs ON 
+	dbo.Tss_PubGoods.SiPubUnitSpecs1 = dbo.Tss_PubUnitSpecs.SiPubUnitSpecs
+GROUP BY 
+	dbo.Tss_InvEntrance_Dt.Des_InvEntDetailDesc, dbo.Tss_PubUnitSpecs.Des_PubUnitDesc, dbo.Tss_PubGoods.Cod_PubGoodsCode, 
+    dbo.Tss_PubGoods.Des_PubGoodsDesc, dbo.Tss_InvEntrance_Dt.SiInvEntrance_Hd, dbo.Tss_InvEntrance_Dt.SiPubGoods,
+    dbo.Tss_InvEntrance_Dt.Cod_invEntDetailCode, dbo.Tss_InvEntrance_Dt.Num_Serial
+HAVING      
+	(dbo.Tss_InvEntrance_Dt.SiInvEntrance_Hd = @SiInvEntrance_Hd)
+order by
+	dbo.Tss_InvEntrance_Dt.Cod_invEntDetailCode
+else
+DECLARE EntranceDt CURSOR FOR 
+SELECT
+	SUM(dbo.Tss_InvEntrance_Dt.Num_VaredehRialiAmt) As RialiAmt,     
+	SUM(dbo.Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount) AS WeightSum, 
+	SUM(dbo.Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount2) AS RoleNoSum, 
+	dbo.Tss_InvEntrance_Dt.Des_InvEntDetailDesc, 
+	dbo.Tss_PubUnitSpecs.Des_PubUnitDesc, 
+	dbo.Tss_PubGoods.Cod_PubGoodsCode, 
+	dbo.Tss_PubGoods.Des_PubGoodsDesc, 
+	dbo.Tss_InvEntrance_Dt.SiInvEntrance_Hd, 
+	dbo.Tss_InvEntrance_Dt.SiPubGoods,
+	'' as Cod_invEntDetailCode,
+	0 as Num_Serial
+FROM         
+	dbo.Tss_InvEntrance_Dt INNER JOIN dbo.Tss_PubGoods ON 
+	dbo.Tss_InvEntrance_Dt.SiPubGoods = dbo.Tss_PubGoods.SiPubGoods LEFT OUTER JOIN dbo.Tss_PubUnitSpecs ON 
+	dbo.Tss_PubGoods.SiPubUnitSpecs1 = dbo.Tss_PubUnitSpecs.SiPubUnitSpecs
+GROUP BY 
+	dbo.Tss_InvEntrance_Dt.Des_InvEntDetailDesc, dbo.Tss_PubUnitSpecs.Des_PubUnitDesc, dbo.Tss_PubGoods.Cod_PubGoodsCode, 
+    dbo.Tss_PubGoods.Des_PubGoodsDesc, dbo.Tss_InvEntrance_Dt.SiInvEntrance_Hd, dbo.Tss_InvEntrance_Dt.SiPubGoods
+HAVING      
+	(dbo.Tss_InvEntrance_Dt.SiInvEntrance_Hd = @SiInvEntrance_Hd)
+
+OPEN EntranceDt
+
+FETCH NEXT FROM EntranceDt 
+INTO @RialiAmt, @WeightSum , @RoleNoSum , @Des_InvEntDetailDesc ,@Des_PubUnitDesc , @Cod_PubGoodsCode , @Des_PubGoodsDesc , @SiInvEntranceHd, @SiPubGoods, @Cod_invEntDetailCode, @Num_Serial  
+WHILE @@FETCH_STATUS = 0
+BEGIN
+	SELECT     @DesPubGoodsDesc1=isnull(ltrim(rtrim(dbo.Tss_PubTechSpecsToGoods.Des_TechSpecValue)),'')
+	FROM         dbo.Tss_PubTechSpecsToGoods INNER JOIN
+	                      dbo.Tss_PubCustomCodes ON dbo.Tss_PubTechSpecsToGoods.SiPubCustomCodes = dbo.Tss_PubCustomCodes.SiPubCustomCodes
+	WHERE     (dbo.Tss_PubTechSpecsToGoods.SiPubGoods = @SiPubGoods) AND (dbo.Tss_PubTechSpecsToGoods.SiPubCustomCodes = 238)
+	
+	SELECT     @DesPubGoodsDesc2=isnull(ltrim(rtrim(dbo.Tss_PubTechSpecsToGoods.Des_TechSpecValue)),'')
+	FROM         dbo.Tss_PubTechSpecsToGoods INNER JOIN
+	                      dbo.Tss_PubCustomCodes ON dbo.Tss_PubTechSpecsToGoods.SiPubCustomCodes = dbo.Tss_PubCustomCodes.SiPubCustomCodes
+	WHERE     (dbo.Tss_PubTechSpecsToGoods.SiPubGoods = @SiPubGoods) AND (dbo.Tss_PubTechSpecsToGoods.SiPubCustomCodes = 1528)
+	
+	SELECT     @DesPubGoodsDesc3=isnull(ltrim(rtrim(dbo.Tss_PubTechSpecsToGoods.Des_TechSpecValue)),'')
+	FROM         dbo.Tss_PubTechSpecsToGoods INNER JOIN
+	              dbo.Tss_PubCustomCodes ON dbo.Tss_PubTechSpecsToGoods.SiPubCustomCodes = dbo.Tss_PubCustomCodes.SiPubCustomCodes
+	WHERE     (dbo.Tss_PubTechSpecsToGoods.SiPubGoods = @SiPubGoods) AND (dbo.Tss_PubTechSpecsToGoods.SiPubCustomCodes = 1298)
+	
+	SELECT     @DesPubGoodsDesc4=isnull(ltrim(rtrim(dbo.Tss_PubTechSpecsToGoods.Des_TechSpecValue)),'')
+	FROM         dbo.Tss_PubTechSpecsToGoods INNER JOIN
+	                      dbo.Tss_PubCustomCodes ON dbo.Tss_PubTechSpecsToGoods.SiPubCustomCodes = dbo.Tss_PubCustomCodes.SiPubCustomCodes
+	WHERE     (dbo.Tss_PubTechSpecsToGoods.SiPubGoods = @SiPubGoods) AND (dbo.Tss_PubTechSpecsToGoods.SiPubCustomCodes = 1299)	
+
+print 'ok'
+	Set @DesPubGoodsDesc=isnull(@DesPubGoodsDesc2,'')+' '+isnull(@Des_PubGoodsDesc,'')+' '+isnull(@DesPubGoodsDesc1,'')
+	if isnull(@DesPubGoodsDesc3,'')<>''
+		Set @Gramage=convert(numeric,@DesPubGoodsDesc3)
+	Else
+		Set @Gramage=0
+
+	if isnull(@DesPubGoodsDesc4,'')<>''
+		Set @Width=  convert(numeric,@DesPubGoodsDesc4)
+	Else
+		Set @Width= 0
+print 'ok'
+
+	insert into @TempTable 
+	(
+	RialiAmt,
+	WeightSum, 
+	RoleNoSum, 
+	Des_InvEntDetailDesc, 
+	Des_PubUnitDesc, 
+	Cod_PubGoodsCode, 
+	Des_PubGoodsDesc, 
+	SiInvEntranceHd, 
+	SiPubGoods, 
+	DesPubGoodsDesc,
+	Gramage, 
+	Width,
+	Des_BarnamehNo,
+	Des_HavalehNo,
+	Des_VehicleNo,
+	Num_ResidOriginWeight,
+	Num_FactoryBascule,
+	Num_BasculeDiff,
+	Num_TransportCost,
+	Cod_invEntDetailCode,
+	Num_Serial
+	)	
+	values
+	(
+	@RialiAmt,
+	@WeightSum, 
+	@RoleNoSum, 
+	@Des_InvEntDetailDesc,
+	@Des_PubUnitDesc, 
+	@Cod_PubGoodsCode, 
+	@Des_PubGoodsDesc, 
+	@SiInvEntranceHd, 
+	@SiPubGoods,
+	@DesPubGoodsDesc,
+	@Gramage, 
+	@Width, 
+	@Des_BarnamehNo,
+	@Des_HavalehNo,
+	@Des_VehicleNo,
+	@Num_ResidOriginWeight,
+	@Num_FactoryBascule,
+	@Num_BasculeDiff,
+	@Num_TransportCost,
+	@Cod_invEntDetailCode,
+	@Num_Serial
+	)
+   FETCH NEXT FROM EntranceDt 
+	INTO @RialiAmt, @WeightSum , @RoleNoSum , @Des_InvEntDetailDesc ,@Des_PubUnitDesc , @Cod_PubGoodsCode , @Des_PubGoodsDesc , @SiInvEntranceHd, @SiPubGoods, @Cod_invEntDetailCode, @Num_Serial  
+END
+
+CLOSE EntranceDt
+DEALLOCATE EntranceDt
+
+if dbo.Tss_StdFindSubLoc(0)<>'zarin'
+select 
+	RialiAmt,
+	WeightSum, 
+	RoleNoSum, 
+	Des_InvEntDetailDesc, 
+	Des_PubUnitDesc, 
+	Cod_PubGoodsCode , 
+	Des_PubGoodsDesc , 
+	SiInvEntranceHd , 
+	SiPubGoods , 
+	DesPubGoodsDesc ,
+	Gramage, 
+	Width, 
+	Des_BarnamehNo,
+	Des_HavalehNo,
+	Des_VehicleNo,
+	Num_ResidOriginWeight,
+	Num_FactoryBascule,
+	Num_BasculeDiff,
+	Num_TransportCost,
+	Cod_invEntDetailCode,
+	Num_Serial
+From 
+	@TempTable
+order by
+	convert(numeric,Cod_invEntDetailCode)
+else
+select 
+	RialiAmt,
+	WeightSum, 
+	RoleNoSum, 
+	Des_InvEntDetailDesc, 
+	Des_PubUnitDesc, 
+	Cod_PubGoodsCode , 
+	Des_PubGoodsDesc , 
+	SiInvEntranceHd , 
+	SiPubGoods , 
+	DesPubGoodsDesc ,
+	Gramage, 
+	Width, 
+	Des_BarnamehNo,
+	Des_HavalehNo,
+	Des_VehicleNo,
+	Num_ResidOriginWeight,
+	Num_FactoryBascule,
+	Num_BasculeDiff,
+	Num_TransportCost,
+	Cod_invEntDetailCode,
+	Num_Serial
+From 
+	@TempTable
+
+
+delete @TempTable
+
+GO
