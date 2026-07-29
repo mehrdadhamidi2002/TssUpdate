@@ -14,6 +14,14 @@ GO
 SET NOCOUNT ON
 GO
 
+
+-- Add Tss_SalInvoice_Hd if it doesn't exist
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'Tss_SalInvoice_Hd' AND COLUMN_NAME = 'Sta_ContIsLaminate')
+BEGIN
+    ALTER TABLE dbo.Tss_SalInvoice_Hd ADD Sta_ContIsLaminate smallint NULL
+END
+GO
+
 -- Add Sta_SayadiReg if it doesn't exist
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'Tss_RapReceivedCheque' AND COLUMN_NAME = 'Sta_SayadiReg')
 BEGIN
@@ -5979,3 +5987,1447 @@ Begin
 End
 
 GO
+
+alter proc Tss_RapFrmRecievedChequeRepRStpAll
+(
+    @SiPubSubLocations numeric=0,
+    @SiRapCashDefine numeric=0,
+    @SiPubPersonsSpec numeric=0,
+    @GhabzNo varchar(50)='',
+    @RegDate varchar(10)='1404/01/01',
+    @RegDate2 varchar(10)='1404/12/29',
+    @UsanceDate varchar(10)='',
+    @UsanceDate2 varchar(10)='',
+    @Dat_RapReceivedChequeVosoolDate varchar(10)='',
+    @Dat_RapReceivedChequeVosoolDate2 varchar(10)='',
+    @Dat_RapReceivedChequeBargashtDate varchar(10)='',
+    @Dat_RapReceivedChequeBargashtDate2 varchar(10)='',
+    @Dat_RapReceivedChequeToPerDate varchar(10)='',
+    @Dat_RapReceivedChequeToPerDate2 varchar(10)='',
+    @Dat_RapReceivedChequeToBankDate varchar(10)='',
+    @Dat_RapReceivedChequeToBankDate2 varchar(10)='',
+    @Dat_RapReceivedChequeHoghughiDate varchar(10)='',
+    @Dat_RapReceivedChequeHoghughiDate2 varchar(10)='',
+    @Dat_RapReceivedChequeCancelDate varchar(10)='',
+    @Dat_RapReceivedChequeCancelDate2 varchar(10)='',
+    @Dat_EsterdadToPer varchar(10)='',
+    @Dat_EsterdadToPer2 varchar(10)='',
+    @Dat_EsterdadToCashier varchar(10)='',
+    @Dat_EsterdadToCashier2 varchar(10)='',
+    @Dat_RapReceivedChequeToAgainDate varchar(10)='',
+    @Dat_RapReceivedChequeToAgainDate2 varchar(10)='',
+    @Sta_ChekRecieptMainOrNot SmallInt=0,
+    @Sta_RapReceivedChequeState varchar(500)='1',
+    @SiCheks varchar(8000)='',
+    @StaDateFilter SmallInt=0,
+    @SiUser numeric=1,
+    @SiToPer varchar(1000)='',
+    @SiRelatedPer varchar(1000)='',
+    @SayadiRegistered char(1)='0',
+    @NotSayadiRegistered char(1)='0',
+    @IsElectronic char(1)='0',
+	@StaSumPers smallint=0
+)
+as
+
+declare    
+    @SayadiSql varchar(1000)
+
+    if @SayadiRegistered='1' and @NotSayadiRegistered = '0'
+        Set @SayadiSql = 'AND (isnull(cheks1.Des_ReceivedChequeSayadiNationalCode,''0'')>''0'')'
+
+    if @SayadiRegistered='0' and @NotSayadiRegistered = '1'
+        Set @SayadiSql = 'AND (isnull(cheks1.Des_ReceivedChequeSayadiNationalCode,''0'')=''0'')'
+
+    if @SayadiRegistered='1' and @NotSayadiRegistered = '1'
+        Set @SayadiSql = ''
+
+    if @SayadiRegistered='0' and @NotSayadiRegistered = '0'
+        Set @SayadiSql = ''
+
+    if @IsElectronic='1' 
+        Set @SayadiSql = 'AND (isnull(cheks1.Sta_IsChecqueElectronic,''0'')=''1'')'
+
+if @GhabzNo=''
+Begin
+	Declare
+		@SqlText varchar(8000),
+		@Whr varchar(8000)
+	
+	-- Check if aggregation is needed
+	IF @StaSumPers = 1
+	BEGIN
+		Set @SqlText =
+		'SELECT 
+			CAST(NULL AS varchar(50)) AS GhabzNo,
+			CAST(NULL AS varchar(200)) AS BankName,
+			cheks1.GiverCode,
+			cheks1.GiverName,
+			CAST(NULL AS varchar(1)) AS RecieverCode,
+			CAST(NULL AS varchar(1)) AS RecieverName,
+			CAST(NULL AS varchar(10)) AS RegDate,
+			CAST(NULL AS varchar(10)) AS UsanceDate,
+			SUM(cheks1.ChequeAmount) AS ChequeAmount,
+			CAST(NULL AS varchar(50)) AS BankBranchCode,
+			CAST(NULL AS varchar(50)) AS ChequeSerial,
+			CAST(NULL AS varchar(500)) AS Tozihat,
+			CAST(NULL AS varchar(1500)) AS RecieptTozih,
+			CAST(NULL AS smallint) AS Sta_ChekRecieptMainOrNot,
+			CAST(NULL AS numeric(18,0)) AS SiRapReceivedCheque,
+			CAST(NULL AS varchar(50)) AS ContractNo,
+			CAST(NULL AS numeric(18,0)) AS SiPubPersonsSpec,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeCngDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeVosoolDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeBargashtDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeCancelDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToPerDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToBankDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeHoghughiDate,
+			CAST(NULL AS numeric(18,0)) AS SiPubSubLocations,
+			CAST(NULL AS smallint) AS Sta_RapReceivedChequeState,
+			CAST(NULL AS numeric(18,0)) AS SiRapCashDefine,
+			CAST(NULL AS numeric(18,0)) AS SiPubCustomCodes,
+			CAST(NULL AS varchar(50)) AS Cod_PubPersonCode,
+			CAST(NULL AS varchar(401)) AS Des_FullName,
+			CAST(NULL AS varchar(50)) AS GirandehCode,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToAgainDate,
+			CAST(NULL AS varchar(50)) AS Dat_EsterdadToPer,
+			CAST(NULL AS varchar(50)) AS Dat_EsterdadToCashier,
+			CAST(NULL AS varchar(401)) AS GirandehDesc,
+			CAST(NULL AS varchar(50)) AS Des_ReceivedChequeSayadiCode,
+			CAST(NULL AS varchar(50)) AS Des_ReceivedChequeSayadiNationalCode,
+			CAST(NULL AS smallint) AS Sta_IsChecqueElectronic
+		FROM         
+			Tss_RapRecCheckGhabzRep1Vw cheks1 LEFT OUTER JOIN
+			Tss_RapRecCheckGhabzRep2Vw cheks2 ON cheks1.SiRapReceivedCheque = cheks2.SiRapReceivedCheque
+		'
+	END
+	ELSE
+	BEGIN
+		Set @SqlText =
+		'select * from (SELECT   distinct  
+			cheks1.GhabzNo, 
+			cheks1.BankName, 
+			cheks1.GiverCode, 
+			cheks1.GiverName, 
+			'''' RecieverCode, 
+			'''' RecieverName, 
+			cheks1.RegDate, 
+			cheks1.UsanceDate, 
+			cheks1.ChequeAmount, 
+			cheks1.BankBranchCode, 
+			cheks1.ChequeSerial, 
+			cheks1.Tozihat, 
+			cheks1.RecieptTozih, 
+			cheks1.Sta_ChekRecieptMainOrNot, 
+			cheks1.SiRapReceivedCheque, 
+			cheks2.Cod_SaleAgreement AS ContractNo, 
+			cheks1.SiPubPersonsSpec, 
+			cheks1.Dat_RapReceivedChequeCngDate, 
+			cheks1.Dat_RapReceivedChequeVosoolDate, 
+			cheks1.Dat_RapReceivedChequeBargashtDate, 
+			cheks1.Dat_RapReceivedChequeCancelDate, 
+			cheks1.Dat_RapReceivedChequeToPerDate, 
+			cheks1.Dat_RapReceivedChequeToBankDate, 
+			cheks1.Dat_RapReceivedChequeHoghughiDate,
+			cheks1.SiPubSubLocations, 
+			cheks1.Sta_RapReceivedChequeState, 
+			cheks1.SiRapCashDefine, 
+			cheks1.SiPubCustomCodes, 
+			cheks1.Cod_PubPersonCode, 
+			cheks1.Des_FullName, 
+			cheks1.GirandehCode, 
+			cheks1.Dat_RapReceivedChequeToAgainDate, 
+			cheks1.Dat_EsterdadToPer, 
+			cheks1.Dat_EsterdadToCashier, 
+			cheks1.GirandehDesc,
+			cheks1.Des_ReceivedChequeSayadiCode,
+			cheks1.Des_ReceivedChequeSayadiNationalCode,
+			cheks1.Sta_IsChecqueElectronic
+		FROM         
+			Tss_RapRecCheckGhabzRep1Vw cheks1 LEFT OUTER JOIN
+			Tss_RapRecCheckGhabzRep2Vw cheks2 ON cheks1.SiRapReceivedCheque = cheks2.SiRapReceivedCheque
+		'
+	END
+
+	Set @Whr = ''
+
+	if isnull(@SiPubSubLocations,0)<>0	
+	Begin
+		Set @Whr = ' WHERE     
+				     (cheks1.SiPubSubLocations = '+convert(varchar,@SiPubSubLocations)+') '
+		if isnull(@SiPubPersonsSpec,0)<>0 
+		Set @Whr = @Whr + ' AND  (cheks1.SiPubPersonsSpec = '+convert(varchar,@SiPubPersonsSpec)+') '
+	End	 
+	Else
+	Begin
+		if isnull(@SiPubPersonsSpec,0)<>0 
+			Set @Whr = @Whr + ' Where  (cheks1.SiPubPersonsSpec = '+convert(varchar,@SiPubPersonsSpec)+') '
+		Else
+			Set @Whr = @Whr + ' Where '
+	End
+
+	if @SiToPer<>''
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+		Set @Whr = @Whr + ' AND (cheks1.SiRapReceivedCheque in (SELECT SiRapReceivedCheque FROM Tss_RapRecChequeToBank WHERE (SiPubPersonsSpec IN (SELECT Sisel FROM dbo.Tss_StdStringSiFindUdf('+''''+@SiToPer+''''+')))))'
+	Else
+		Set @Whr = @Whr + ' (cheks1.SiRapReceivedCheque in (SELECT SiRapReceivedCheque FROM Tss_RapRecChequeToBank WHERE (SiPubPersonsSpec IN (SELECT Sisel FROM dbo.Tss_StdStringSiFindUdf('+''''+@SiToPer+''''+')))))'
+	End
+
+	if @SiRelatedPer<>''
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+		Set @Whr = @Whr + ' AND (cheks1.SiPerRelatedSaler in  (SELECT Sisel FROM dbo.Tss_StdStringSiFindUdf('+''''+@SiRelatedPer+''''+')))'
+	Else
+		Set @Whr = @Whr + ' (cheks1.SiPerRelatedSaler in  (SELECT Sisel FROM dbo.Tss_StdStringSiFindUdf('+''''+@SiRelatedPer+''''+')))'
+	End
+
+	if (@Sta_RapReceivedChequeState<>'') and (@Sta_RapReceivedChequeState<>'1')
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+		Set @Whr = @Whr + ' AND (cheks1.Sta_RapReceivedChequeState in (Select Sisel from dbo.Tss_StdStringSiFindUdf('+''''+@Sta_RapReceivedChequeState+''''+')))'
+	Else
+		Set @Whr = @Whr + '  (cheks1.Sta_RapReceivedChequeState in (Select Sisel from dbo.Tss_StdStringSiFindUdf('+''''+@Sta_RapReceivedChequeState+''''+')))'
+	End
+	else
+
+IF (@Sta_RapReceivedChequeState = '1')
+BEGIN
+    DECLARE @Condition NVARCHAR(MAX)
+
+    SET @Condition = 
+        'cheks1.RegDate BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''' ' +
+        'AND (' +
+            '(ISNULL(cheks1.Dat_RapReceivedChequeToPerDate, '''') <> '''' AND ' +
+             'cheks1.Dat_RapReceivedChequeToPerDate NOT BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''') ' +
+            'OR ' +
+            '(ISNULL(cheks1.Dat_RapReceivedChequeToBankDate, '''') <> '''' AND ' +
+             'cheks1.Dat_RapReceivedChequeToBankDate NOT BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''') ' +
+            'OR ' +
+            '(ISNULL(cheks1.Dat_RapReceivedChequeBargashtDate, '''') BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''') ' +
+            'OR ' +
+            '(ISNULL(cheks1.Dat_RapReceivedChequeToAgainDate, '''') BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''')' +
+        ')'
+
+    IF ISNULL(@Whr, '') <> ' Where '
+        SET @Whr = @Whr + ' AND ' + @Condition
+    ELSE
+        SET @Whr = ' Where ' + @Condition
+END
+
+	if @SiCheks<>''
+		Set @Whr = @Whr + ' AND (cheks1.SiRapReceivedCheque in (Select SiSel From dbo.Tss_StdStringSiFindUdf('+''''+@SiCheks+''''+')))'
+
+	if @StaDateFilter=0
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.RegDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.RegDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=1
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.UsanceDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.UsanceDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=2
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeVosoolDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeVosoolDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=3
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeBargashtDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeBargashtDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=4
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeToPerDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeToPerDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=5
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeToBankDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeToBankDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=6
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeToAgainDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeToAgainDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=7
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.Dat_EsterdadToPer BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.Dat_EsterdadToPer BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=8
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.Dat_EsterdadToCashier BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.Dat_EsterdadToCashier BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+    if @SayadiSql <> ''
+        Set @Whr = @Whr + @SayadiSql
+
+	-- Handle ORDER BY for aggregation
+	IF @StaSumPers = 1
+	BEGIN
+		-- Add GROUP BY for GiverCode and GiverName
+		Set @SqlText = @SqlText + @Whr + ' GROUP BY cheks1.GiverCode, cheks1.GiverName ORDER BY cheks1.GiverName'
+	END
+	ELSE
+	BEGIN
+		if @Sta_ChekRecieptMainOrNot = 0	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by UsanceDate'
+		
+		if @Sta_ChekRecieptMainOrNot = 1	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeVosoolDate'
+
+		if @Sta_ChekRecieptMainOrNot = 2	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeBargashtDate'
+
+		if @Sta_ChekRecieptMainOrNot = 3	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeToPerDate'
+
+		if @Sta_ChekRecieptMainOrNot = 4	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeToBankDate'
+
+		if @Sta_ChekRecieptMainOrNot = 5	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeToAgainDate'
+
+		if @Sta_ChekRecieptMainOrNot = 6	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_EsterdadToPer'
+
+		if @Sta_ChekRecieptMainOrNot = 7	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_EsterdadToCashier'
+
+		if @Sta_ChekRecieptMainOrNot = 8	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by RegDate'
+	END
+
+    if @SayadiSql <> ''
+        
+if @Whr<>''
+	Set @Whr = @Whr + ' and  (SiPubSubLocations in  (SELECT DISTINCT 
+		Tss_AccFinancePeriodToPlace.SiPubSubLocations
+	FROM         
+		Tss_AccUserToFinancePeriodAndPlace INNER JOIN
+		Tss_AccFinancePeriodToPlace ON 
+		Tss_AccUserToFinancePeriodAndPlace.SiAccFinancePeriodToPlace = Tss_AccFinancePeriodToPlace.SiAccFinancePeriodToPlace
+	WHERE     
+		(Tss_AccUserToFinancePeriodAndPlace.SiPubPersonsSpec = '+convert(varchar,@SiUser)+')))'
+else
+	Set @Whr = @Whr + ' where  (SiPubSubLocations in  (SELECT DISTINCT 
+		Tss_AccFinancePeriodToPlace.SiPubSubLocations
+	FROM         
+		Tss_AccUserToFinancePeriodAndPlace INNER JOIN
+		Tss_AccFinancePeriodToPlace ON 
+		Tss_AccUserToFinancePeriodAndPlace.SiAccFinancePeriodToPlace = Tss_AccFinancePeriodToPlace.SiAccFinancePeriodToPlace
+	WHERE     
+		(Tss_AccUserToFinancePeriodAndPlace.SiPubPersonsSpec = @'+convert(varchar,@SiUser)+')))'
+		
+	print @SqlText
+	
+	exec(@SqlText)
+End
+Else
+Begin
+	-- Handle the ELSE block when @GhabzNo is not empty
+	IF @StaSumPers = 1
+	BEGIN
+		SELECT 
+			CAST(NULL AS varchar(50)) AS GhabzNo,
+			CAST(NULL AS varchar(200)) AS BankName,
+			cheks1.GiverCode,
+			cheks1.GiverName,
+			CAST(NULL AS varchar(1)) AS RecieverCode,
+			CAST(NULL AS varchar(1)) AS RecieverName,
+			CAST(NULL AS varchar(10)) AS RegDate,
+			CAST(NULL AS varchar(10)) AS UsanceDate,
+			SUM(cheks1.ChequeAmount) AS ChequeAmount,
+			CAST(NULL AS varchar(50)) AS BankBranchCode,
+			CAST(NULL AS varchar(50)) AS ChequeSerial,
+			CAST(NULL AS varchar(500)) AS Tozihat,
+			CAST(NULL AS varchar(1500)) AS RecieptTozih,
+			CAST(NULL AS smallint) AS Sta_ChekRecieptMainOrNot,
+			CAST(NULL AS numeric(18,0)) AS SiRapReceivedCheque,
+			CAST(NULL AS varchar(50)) AS ContractNo,
+			CAST(NULL AS numeric(18,0)) AS SiPubPersonsSpec,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeCngDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeVosoolDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeBargashtDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeCancelDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToPerDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToBankDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeHoghughiDate,
+			CAST(NULL AS numeric(18,0)) AS SiPubSubLocations,
+			CAST(NULL AS smallint) AS Sta_RapReceivedChequeState,
+			CAST(NULL AS numeric(18,0)) AS SiRapCashDefine,
+			CAST(NULL AS numeric(18,0)) AS SiPubCustomCodes,
+			CAST(NULL AS varchar(50)) AS Cod_PubPersonCode,
+			CAST(NULL AS varchar(401)) AS Des_FullName,
+			CAST(NULL AS varchar(50)) AS GirandehCode,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToAgainDate,
+			CAST(NULL AS varchar(50)) AS Dat_EsterdadToPer,
+			CAST(NULL AS varchar(50)) AS Dat_EsterdadToCashier,
+			CAST(NULL AS varchar(401)) AS GirandehDesc,
+			CAST(NULL AS varchar(50)) AS Des_ReceivedChequeSayadiCode,
+			CAST(NULL AS varchar(50)) AS Des_ReceivedChequeSayadiNationalCode,
+			CAST(NULL AS smallint) AS Sta_IsChecqueElectronic
+		FROM         
+			Tss_RapRecCheckGhabzRep1Vw cheks1 LEFT OUTER JOIN
+			Tss_RapRecCheckGhabzRep2Vw cheks2 ON cheks1.SiRapReceivedCheque = cheks2.SiRapReceivedCheque
+		WHERE   
+			(cheks1.Sta_CheckToBankState <> 4) and
+			(cheks1.Sta_CheckToBankState <> 3) and 	
+			(cheks1.GhabzNo = @GhabzNo) and
+			(cheks1.Sta_ChekRecieptMainOrNot = @Sta_ChekRecieptMainOrNot )
+		GROUP BY cheks1.GiverCode, cheks1.GiverName
+		ORDER BY cheks1.GiverName
+	END
+	ELSE
+	BEGIN
+		SELECT    distinct 
+			cheks1.GhabzNo, 
+			cheks1.BankName, 
+			'' GiverCode, 
+			'' GiverName, 
+			cheks1.RecieverCode, 
+			cheks1.RecieverName, 
+			cheks1.RegDate, 
+			cheks1.UsanceDate, 
+			cheks1.ChequeAmount, 
+			cheks1.BankBranchCode, 
+			cheks1.ChequeSerial, 
+			cheks1.Tozihat, 
+			cheks1.RecieptTozih, 
+			cheks1.Sta_ChekRecieptMainOrNot, 
+			cheks1.SiRapReceivedCheque, 
+			cheks2.Cod_SaleAgreement AS ContractNo, 
+			cheks1.SiPubPersonsSpec, 
+			cheks1.Dat_RapReceivedChequeCngDate, 
+			cheks1.Dat_RapReceivedChequeVosoolDate, 
+			cheks1.Dat_RapReceivedChequeBargashtDate, 
+			cheks1.Dat_RapReceivedChequeCancelDate, 
+			cheks1.Dat_RapReceivedChequeToPerDate, 
+			cheks1.Dat_RapReceivedChequeToBankDate, 
+			cheks1.Dat_RapReceivedChequeHoghughiDate, 
+			cheks1.SiPubSubLocations, 
+			cheks1.Sta_RapReceivedChequeState, 
+			cheks1.SiRapCashDefine, 
+			cheks1.SiPubCustomCodes, 
+			cheks1.Cod_PubPersonCode, 
+			cheks1.Des_FullName,
+			cheks1.GirandehCode, 
+			cheks1.GirandehDesc,
+			cheks1.Dat_EsterdadToCashier,
+			cheks1.Dat_EsterdadToPer,
+			cheks1.Des_ReceivedChequeSayadiCode,
+			cheks1.Des_ReceivedChequeSayadiNationalCode,
+			cheks1.Dat_RapReceivedChequeToAgainDate,
+			cheks1.Sta_IsChecqueElectronic
+		FROM         
+			Tss_RapRecCheckGhabzRep1Vw cheks1 LEFT OUTER JOIN
+			Tss_RapRecCheckGhabzRep2Vw cheks2 ON cheks1.SiRapReceivedCheque = cheks2.SiRapReceivedCheque
+		WHERE   
+			(cheks1.Sta_CheckToBankState <> 4) and
+			(cheks1.Sta_CheckToBankState <> 3) and 	
+			(cheks1.GhabzNo = @GhabzNo) and
+			(cheks1.Sta_ChekRecieptMainOrNot = @Sta_ChekRecieptMainOrNot )
+	END
+End
+
+GO
+alter PROCEDURE Tss_SalUntFactor_HdVStp  
+(      
+   @InternalWhere VarChar(8000)='',    
+   @Where VarChar(8000)='',    
+   @Order VarChar(8000)='',
+	@SiUser Numeric=1,
+	@RowCount numeric=300
+) 
+
+AS    
+
+Set arithabort ON
+Set concat_null_yields_null ON
+Set ansi_nulls ON
+Set ansi_null_dflt_on ON
+Set ansi_padding ON
+Set ansi_warnings ON
+Set quoted_identifier ON
+
+
+Declare
+	@Des_StdUserToBdsCondition varchar(8000)
+
+set @InternalWhere = isnull(@InternalWhere,'')
+set @Where = isnull(@Where,'')
+set @Order = isnull(@Order,'')
+
+Declare 
+	@SaleMali nvarchar(4),
+	@Cod_AccFinancePeriod nvarchar(50),
+	@Sql varchar(8000),
+	@Adate nvarchar(10)
+
+if (dbo.Tss_StdFindSubLoc(0)='zarin') or (dbo.Tss_StdFindSubLoc(0)='delta')
+	Set @Adate = dbo.Tss_MiladyToShamsiPar(DATEADD(d,-3,GetDate()))
+else
+begin
+	Set @Adate = dbo.Tss_MiladyToShamsiPar(GetDate())
+	Set @Adate = left(@Adate,4)+'/01/01'
+end
+
+if Not exists
+(
+SELECT        Tss_PubCustomCodes.Des_CustomCodesDesc, Tss_StdSystemUsers.SiPubPersonsSpec
+FROM            Tss_StdSystemUserTogrps INNER JOIN
+                         Tss_PubCustomCodes ON Tss_StdSystemUserTogrps.SiPubCustomCodes = Tss_PubCustomCodes.SiPubCustomCodes INNER JOIN
+                         Tss_StdSystemUsers ON Tss_StdSystemUserTogrps.SiStdSystemUsers = Tss_StdSystemUsers.SiStdSystemUsers
+WHERE        (Tss_PubCustomCodes.Des_CustomCodesDesc = 'SaleApprover') AND (Tss_StdSystemUsers.SiPubPersonsSpec = @SiUser)
+)
+Begin
+	If @Where<>''     
+	   Set @Where=' Where (SiSaler ='+convert(varchar,@SiUser)+') and '+@Where  
+	Else
+	Begin
+		---Set @Adate = left(dbo.Tss_MiladyToShamsiPar(GetDate()),7)
+	
+		Select @Cod_AccFinancePeriod=Max(Convert(numeric,Cod_AccFinancePeriod)) From dbo.Tss_AccFinancePeriod
+		Select @SaleMali=Left(Dat_AccFinancePriodStart,4) From dbo.Tss_AccFinancePeriod where Cod_AccFinancePeriod=@Cod_AccFinancePeriod
+	
+		Set @Where=' Where (SiSaler ='+convert(varchar,@SiUser)+') and (Dat_FactorDate>='+''''+@Adate+''''+')'
+	
+		--set @StDate=''
+		--set @EnDate=''
+		
+		--if (@StDate='') or (isnull(@StDate,'')='')
+		--	Set 	@StDate= @SaleMali+'/01/01'    
+		--if (@EnDate='') or (isnull(@EnDate,'')='')
+		--	Set 	@EnDate=  @SaleMali+'/12/30'
+		--Set 	@StDate= '1390/01/01'    
+		--Set 	@EnDate= '1390/12/30'
+	End
+	If @InternalWhere<>''     
+	Begin
+	   Set @InternalWhere=' Where '+@InternalWhere 
+		Set @Where= ''   
+	End
+End
+Else
+Begin
+	If @Where<>''     
+	   Set @Where=' Where '+@Where  
+	Else
+	Begin
+		--Set @Adate = left(dbo.Tss_MiladyToShamsiPar(GetDate()),7)
+	
+		Select @Cod_AccFinancePeriod=Max(Convert(numeric,Cod_AccFinancePeriod)) From dbo.Tss_AccFinancePeriod
+		Select @SaleMali=Left(Dat_AccFinancePriodStart,4) From dbo.Tss_AccFinancePeriod where Cod_AccFinancePeriod=@Cod_AccFinancePeriod
+	
+		Set @Where=' Where (Dat_FactorDate>='+''''+@Adate+''''+')'
+	
+		--set @StDate=''
+		--set @EnDate=''
+		
+		--if (@StDate='') or (isnull(@StDate,'')='')
+		--	Set 	@StDate= @SaleMali+'/01/01'    
+		--if (@EnDate='') or (isnull(@EnDate,'')='')
+		--	Set 	@EnDate=  @SaleMali+'/12/30'
+		--Set 	@StDate= '1390/01/01'    
+		--Set 	@EnDate= '1390/12/30'
+	End
+	If @InternalWhere<>''     
+	Begin
+	   Set @InternalWhere=' Where '+@InternalWhere 
+		Set @Where= ''   
+	End
+End
+
+if dbo.Tss_StdFindSubLoc(0)<>'aeen' 
+begin
+	If @Order<>''     
+	   Set @Order=' Order By '+@Order 
+	Else
+		SET @Order = ' ORDER BY Dat_FactorDate DESC,
+               CASE WHEN ISNUMERIC(Cod_FactorCode) = 1 
+                    THEN CONVERT(numeric, Cod_FactorCode) 
+                    ELSE NULL END DESC';
+
+
+end
+else
+begin
+	If @Order<>''     
+	   Set @Order=' Order By '+@Order --+' OFFSET '+convert(varchar,@RowCount)+' ROWS FETCH NEXT '+convert(varchar,@RowCount)+' ROWS ONLY '
+	Else
+		Set @Order=' ORDER BY convert(numeric,ltrim(rtrim(Cod_FactorCode))) '--++' OFFSET '+convert(varchar,@RowCount)+' ROWS FETCH NEXT '+convert(varchar,@RowCount)+' ROWS ONLY '
+end
+
+Exec(    
+'Select * From    
+(    
+   Select *,
+   ContFactDiff=
+   case when FactorNo>0 then Num_GdsBalancFee-FactorFee 
+   else 0 end
+From    
+   (    
+   SELECT    
+		FactHd.Sta_SentToCust,
+		FactHd.Sta_TasviehType,
+		FactHd.Sta_CurrencyType,
+		FactHd.Num_CurrencyRate, 
+		FactHd.Num_CottageTotWeight, 
+		FactHd.Sta_FactorType,
+		FactHd.CottageNo, 
+		FactHd.CottageDate, 
+		FactHd.CustomsCode, 
+		FactHd.CustomLicenseNo,
+		FactHd.SiSalFactor_Hd, 
+		FactHd.SiSalTypeOfFactor, 
+		FactHd.Num_Karmozd, 
+		FactHd.Sta_HasKarmozd,
+		FactHd.Sta_SecondGdsDesc,
+		FactHd.Sta_FactorHdState, 
+		FactHd.SiSalInvoice_Hd, 
+		FactHd.Cod_FactorCode, 
+		FactHd.Dat_FactorDate, 
+		FactHd.Num_FactorPreRecieveAmount, 
+		FactHd.Num_FactorDiscountAmount, 
+		FactHd.SiAccVoucher_Dt, 
+		FactHd.StmSalFactor_Hd, 
+		VchDt.SiAccVoucher_Hd, 
+		VchDt.Num_VDetRow, 
+		IvcHd.Cod_SaleAgreement, 
+		IvcHd.Des_SaleAgreementDesc, 
+		IvcHd.Dat_SaleRequestRegDate, 
+		IvcHd.Dat_SalReqToContractDate, 
+		IvcHd.Cod_SaleAgreement2, 
+		IvcHd.Sta_MainOrNot, 
+		IvcHd.Sta_ForProdOrSale, 
+		dbo.Tss_StdStaLabelsUdf(1081, IvcHd.Sta_MainOrNot) AS Des_MainOrNot,
+		Cod_PubPersonCode= 
+		Case When Isnull(FactHd.SiSalInvoice_Hd,0)<>0 then pPers.Cod_PubPersonCode else pPersNoCont.Cod_PubPersonCode End,
+		Des_FullName= 
+		Case When Isnull(FactHd.SiSalInvoice_Hd,0)<>0 then pPers.Des_FullName else pPersNoCont.Des_FullName End,
+		dbo.Tss_SalFactorPriceUdf(3, FactHd.SiSalFactor_Hd, NULL) AS TotalRow, 
+		dbo.Tss_SalFactorPriceUdf(1, FactHd.SiSalFactor_Hd, FactHd.SiSalInvoice_Hd) AS SrvPrc, 
+		dbo.Tss_SalFactorPriceUdf(2, FactHd.SiSalFactor_Hd, FactHd.SiSalInvoice_Hd) AS AllPrc, 
+		dbo.Tss_SalFactorPriceUdf(18, FactHd.SiSalFactor_Hd, FactHd.SiSalInvoice_Hd) AS ArzeshAf4SrvPrc, 
+/*		dbo.Tss_SalFactorPriceUdf(10, FactHd.SiSalFactor_Hd, FactHd.SiSalInvoice_Hd) AS KeliSaleSrvPrc, 
+		dbo.Tss_SalFactorPriceUdf(11, FactHd.SiSalFactor_Hd, FactHd.SiSalInvoice_Hd) AS HamlSrvPrc, 
+		dbo.Tss_SalFactorPriceUdf(12, FactHd.SiSalFactor_Hd, FactHd.SiSalInvoice_Hd) AS GhalebProdSrvPrc, 
+		dbo.Tss_SalFactorPriceUdf(13, FactHd.SiSalFactor_Hd, FactHd.SiSalInvoice_Hd) AS ZincFilmSrvPrc, 
+		dbo.Tss_SalFactorPriceUdf(14, FactHd.SiSalFactor_Hd, FactHd.SiSalInvoice_Hd) AS ZincChapKeliSrvPrc, 
+		dbo.Tss_SalFactorPriceUdf(15, FactHd.SiSalFactor_Hd, FactHd.SiSalInvoice_Hd) AS KeliSakhtSrvPrc, 
+		dbo.Tss_SalFactorPriceUdf(16, FactHd.SiSalFactor_Hd, FactHd.SiSalInvoice_Hd) AS Shahrdari2SrvPrc, 
+		dbo.Tss_SalFactorPriceUdf(17, FactHd.SiSalFactor_Hd, FactHd.SiSalInvoice_Hd) AS ArzeshAf2SrvPrc, 
+		dbo.Tss_SalFactorPriceUdf(19, FactHd.SiSalFactor_Hd, FactHd.SiSalInvoice_Hd) AS HamloBarbariSrvPrc, 
+		dbo.Tss_SalFactorPriceUdf(20, FactHd.SiSalFactor_Hd, FactHd.SiSalInvoice_Hd) AS TarahiSrvPrc, 
+		dbo.Tss_SalFactorPriceUdf(21, FactHd.SiSalFactor_Hd, FactHd.SiSalInvoice_Hd) AS AlalTarrahiPrc, 
+		dbo.Tss_SalFactorPriceUdf(22, FactHd.SiSalFactor_Hd, FactHd.SiSalInvoice_Hd) AS AlalSakhteGhalebPrc, 
+		dbo.Tss_SalFactorPriceUdf(23, FactHd.SiSalFactor_Hd, FactHd.SiSalInvoice_Hd) AS HaftDarsadeAlalKeliPrc, 
+		dbo.Tss_SalFactorPriceUdf(24, FactHd.SiSalFactor_Hd, FactHd.SiSalInvoice_Hd) AS MakharejeTaghribiTarhshakhtKeliPrc, 
+		dbo.Tss_SalFactorPriceUdf(25, FactHd.SiSalFactor_Hd, FactHd.SiSalInvoice_Hd) AS KasreMAliatPrc, 
+		dbo.Tss_SalFactorPriceUdf(26, FactHd.SiSalFactor_Hd, FactHd.SiSalInvoice_Hd) AS HazinehTarahiSrvPrc, */
+		FactHd.Des_FactorDesc, 
+		IvcHd.Cod_SaleAgreementChange, 
+		FactHd.SiPubPersonsSpec, 
+		pPersNoCont.Cod_PubPersonCode AS CodPerson, 
+		pPersNoCont.Des_FullName AS DesPerson, 
+		pPers.Cod_PersEconomicCode, 
+		pPers.Des_PersonAddress, 
+		Tss_PubSubLocations.Cod_SubLocCode, 
+      Tss_PubSubLocations.Des_SubLocName,
+		Tss_PubSubLocations.SiPubSubLocations,
+		Tss_PubSubLocations.Sta_IsLegalCompany,
+		FactHd.Sta_InvoiceCodePrint, 
+		FactHd.Sta_JensPrint, 
+		pPers.Des_CoAndOrgNationalCode,
+		Tss_PubSubLocations.Cod_OrgRegisterNo,
+		FactHd.Sta_TaxCalc, 
+		Registerer.Cod_PubPersonCode AS CodRegisterer, 
+		Registerer.Des_FullName AS DesRegisterer, 
+		Editor.Cod_PubPersonCode AS CodEditor, 
+		Editor.Des_FullName AS DesEditor, 
+		FactHd.Tss_SalFactor_HdRegTime, 
+      FactHd.Tss_SalFactor_HdEditTime, 
+		--pPers.SiPerRelatedSaler as SiSaler,
+		dbo.Tss_PubFindRelatedSalerSi(FactHd.SiPubPersonsSpec)  as SiSaler,
+		FactHd.Num_AddedValue, 
+		Tss_PubPersonsViw.Cod_PubPersonCode CodRelatedPer, 
+        Tss_PubPersonsViw.Des_FullName DesRelatedPer,
+		isnull((SELECT top 1 isnull(Num_FeeAdjust,0) FROM Tss_SalInvoice_Dt WHERE (SiSalInvoice_Hd = FactHd.SiSalInvoice_Hd)),0) FeeAdjust, 
+		isnull((SELECT top 1 isnull(Num_GdsBalancFee,0) FROM Tss_SalInvoice_Dt WHERE (SiSalInvoice_Hd = FactHd.SiSalInvoice_Hd)),0) Num_GdsBalancFee, 
+		isnull((SELECT top 1 Num_FactDetGoodsNo FROM Tss_SalFactor_Dt WHERE (SiSalFactor_Hd = FactHd.SiSalFactor_Hd)),0) FactorNo,
+		isnull((SELECT top 1 Num_FactDetGoodsFee FROM Tss_SalFactor_Dt WHERE (SiSalFactor_Hd = FactHd.SiSalFactor_Hd)),0) FactorFee,
+		Tss_SalTypeOfSales.Cod_SalTypeCode, Tss_SalTypeOfSales.Des_SalTypeDesc,
+		FactHd.irtaxid,
+		FactHd.Taxid,
+		FactHd.Sta_TaxFalg,
+		FactHd.referenceNumber,
+		FactHd.uid, 
+		FactorRef.Cod_FactorCode AS FactorCodeRef, 
+		FactorRef.Dat_FactorDate AS FactorDateRef, FactHd.SiSalFactor_HdRef,
+		dbo.HexToDec(SUBSTRING(FactHd.taxid, 12, 10)) AS Taxdecimal_value
+FROM            Tss_PubSubLocations RIGHT OUTER JOIN
+                         Tss_SalFactor_Hd AS FactorRef RIGHT OUTER JOIN
+                         Tss_SalFactor_Hd AS FactHd ON FactorRef.SiSalFactor_Hd = FactHd.SiSalFactor_HdRef LEFT OUTER JOIN
+                         Tss_SalTypeOfSales ON FactHd.SiSalTypeOfFactor = Tss_SalTypeOfSales.SiSalTypeOfSales LEFT OUTER JOIN
+                         Tss_PubPersonsViw AS Editor ON FactHd.Tss_SalFactor_HdEditor = Editor.SiPubPersonsSpec LEFT OUTER JOIN
+                         Tss_PubPersonsViw AS Registerer ON FactHd.Tss_SalFactor_HdRegisterer = Registerer.SiPubPersonsSpec ON Tss_PubSubLocations.SiPubSubLocations = FactHd.SiPubSubLocations LEFT OUTER JOIN
+                         Tss_PubPersonsViw AS pPersNoCont ON FactHd.SiPubPersonsSpec = pPersNoCont.SiPubPersonsSpec LEFT OUTER JOIN
+                         Tss_PubPersonsViw RIGHT OUTER JOIN
+                         Tss_PubPersonsViw AS pPers INNER JOIN
+                         Tss_SalInvoice_Hd AS IvcHd ON pPers.SiPubPersonsSpec = IvcHd.SiPubPersonsSpec ON Tss_PubPersonsViw.SiPubPersonsSpec = pPers.SiPerRelatedSaler ON 
+                         FactHd.SiSalInvoice_Hd = IvcHd.SiSalInvoice_Hd LEFT OUTER JOIN
+            Tss_AccVoucher_Dt AS VchDt ON FactHd.SiAccVoucher_Dt = VchDt.SiAccVoucher_Dt
+   ) Ccc  '+@InternalWhere+'    
+) CalcSel ' + @Where + @Order)
+
+GO
+
+alter PROCEDURE Tss_InvUntGdsMoroorRoleSerialsVStp
+(  
+   @InternalWhere VarChar(8000)='',  
+   @Where VarChar(8000)='',  
+   @Order VarChar(8000)='',
+   @SiInvInventory Numeric=12,
+	@Date varchar(10)='1401/09/23',
+	@NumCoef2Weight numeric=0,
+   @SiPubGoods VarChar(8000)='',
+	@SiUser numeric=532
+) AS 
+
+  
+If @InternalWhere<>''   
+   Set @InternalWhere=' Where '+@InternalWhere  
+
+
+If @Where<>''   
+   Set @Where=' Where '+@Where  
+else
+   Set @Where=''
+
+
+If @Order<>''   
+   Set @Order=' Order By '+@Order 
+else   
+   Set @Order=' '+@Order 
+
+
+Declare
+	@SqlTxt VarChar(8000),
+	@SqlTxt2 VarChar(8000),
+	@SubLocId varchar(500),
+	@SaleMaliStartDate varchar(10),
+	@Sta_PubPersonsGroup smallint,
+	@IsInvAdmin smallint
+
+Select @IsInvAdmin = dbo.Tss_StdFindIfUserIsInGroup(@SiUser,'InvAdmin')
+
+create table #Temp 
+(
+Num_Serial decimal(21,0),
+moj1In numeric, 
+moj1Out numeric, 
+mojIn numeric, 
+mojOut numeric, 
+SiPubGoods numeric,
+Cod_PubGoodsCode varchar(50), 
+Des_PubGoodsDesc nvarchar(2000), 
+StaInOut int, 
+SiInvInventory numeric,
+SiCust numeric
+)
+
+SELECT     
+	@Sta_PubPersonsGroup = Sta_PubPersonsGroup
+FROM         
+	Tss_PubPersonsSpec
+WHERE     
+	(SiPubPersonsSpec = @SiUser)
+
+Set @SubLocId = dbo.Tss_StdFindSubLoc(0)
+
+Set @SaleMaliStartDate = Left(@Date,4)+'/01/01'
+
+
+
+if (@Sta_PubPersonsGroup = 8) and (@IsInvAdmin = 0)
+Begin
+	if @SiPubGoods<>''
+	begin
+		Set @SqlTxt=
+		'insert into #Temp 
+		SELECT     
+			xx.Num_Serial,
+			Sum(xx.Num_InvEntDetailGdsAmount) as moj1In,
+			0 moj1Out,
+			Sum(xx.Num_InvEntDetailGdsAmount2) as mojIn, 
+			0 as mojOut, 
+			xx.SiPubGoods,
+			(SELECT top 1 Cod_PubGoodsCode FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) as Cod_PubGoodsCode,
+			(SELECT top 1 Des_PubGoodsDesc FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) as Des_PubGoodsDesc,
+			0,
+			Tss_InvEntrance_Hd.SiInvInventory,
+			0 as SiCust
+		FROM        Tss_InvEntrance_Dt xx INNER JOIN
+							  Tss_InvEntrance_Hd ON xx.SiInvEntrance_Hd = Tss_InvEntrance_Hd.SiInvEntrance_Hd
+		WHERE    
+			(xx.SiPubGoods in (Select SiSel from dbo.Tss_StdStringSiFindUdf('+''''+@SiPubGoods+''''+')))  AND 
+			(Tss_InvEntrance_Hd.Dat_InvEnterDate >=  '+''''+@SaleMaliStartDate+''''+') AND
+			(Tss_InvEntrance_Hd.Sta_InvEntBranch = 1) AND
+		   (Tss_InvEntrance_Hd.SiInvInventory = '+convert(varchar,@SiInvInventory)+')
+		GROUP BY xx.Num_Serial, xx.SiPubGoods, Tss_InvEntrance_Hd.SiInvInventory'
+
+		Set @SqlTxt2=
+		'insert into #Temp 
+		SELECT     
+			xx.Num_Serial, 
+			0 as moj1In, 
+			Sum(xx.Num_InvExtDetailGdsAmount) as moj1Out, 
+			0 AS MojIn, 
+			SUM(xx.Num_InvExtDetailGdsAmount2) AS MojOu, 
+			xx.SiPubGoods,
+            (SELECT top 1 Cod_PubGoodsCode FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) AS Cod_PubGoodsCode,
+			(SELECT top 1 Des_PubGoodsDesc FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) as Des_PubGoodsDesc,
+			1 StaInOut,
+			Tss_InvOutGo_Hd.SiInvInventory,
+			0 as SiCust
+		FROM         Tss_InvOutGo_Dt xx INNER JOIN
+                      Tss_InvOutGo_Hd ON xx.SiInvOutGo_Hd = Tss_InvOutGo_Hd.SiInvOutGo_Hd
+		WHERE     
+			(xx.SiPubGoods in (Select SiSel from dbo.Tss_StdStringSiFindUdf('+''''+@SiPubGoods+''''+')))  AND 
+			(Tss_InvOutGo_Hd.Dat_InvExitDate >=  '+''''+@SaleMaliStartDate+''''+') AND
+			(Tss_InvOutGo_Hd.Sta_InvOutBranch = 1) AND
+		    (Tss_InvOutGo_Hd.SiInvInventory = '+convert(varchar,@SiInvInventory)+')
+		GROUP BY xx.Num_Serial, xx.SiPubGoods, Tss_InvOutGo_Hd.SiInvInventory'
+
+		exec(@sqltxt)
+		exec(@sqltxt2)
+		--select * from #Temp
+	end
+
+	
+	if @SiPubGoods=''
+	begin
+		Set @SqlTxt=
+		'insert into #Temp 
+		SELECT     
+			xx.Num_Serial,
+			Sum(xx.Num_InvEntDetailGdsAmount) as moj1In,
+			0 moj1Out,
+			Sum(xx.Num_InvEntDetailGdsAmount2) as mojIn, 
+			0 as mojOut, 
+			xx.SiPubGoods,
+			(SELECT top 1 Cod_PubGoodsCode FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) as Cod_PubGoodsCode,
+			(SELECT top 1 Des_PubGoodsDesc FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) as Des_PubGoodsDesc,
+			0,
+			Tss_InvEntrance_Hd.SiInvInventory,
+			0 as SiCust
+		FROM        Tss_InvEntrance_Dt xx INNER JOIN
+							  Tss_InvEntrance_Hd ON xx.SiInvEntrance_Hd = Tss_InvEntrance_Hd.SiInvEntrance_Hd
+		WHERE    
+			--(xx.SiPubGoods in (Select SiSel from dbo.Tss_StdStringSiFindUdf('+''''+@SiPubGoods+''''+')))  AND 
+			(Tss_InvEntrance_Hd.Dat_InvEnterDate >=  '+''''+@SaleMaliStartDate+''''+') AND
+			(Tss_InvEntrance_Hd.Sta_InvEntBranch = 1) AND
+		   (Tss_InvEntrance_Hd.SiInvInventory = '+convert(varchar,@SiInvInventory)+')
+		GROUP BY xx.Num_Serial, xx.SiPubGoods, Tss_InvEntrance_Hd.SiInvInventory'
+
+		Set @SqlTxt2=
+		'insert into #Temp 
+		SELECT     
+			xx.Num_Serial, 
+			0 as moj1In, 
+			Sum(xx.Num_InvExtDetailGdsAmount) as moj1Out, 
+			0 AS MojIn, 
+			SUM(xx.Num_InvExtDetailGdsAmount2) AS MojOu, 
+			xx.SiPubGoods,
+            (SELECT top 1 Cod_PubGoodsCode FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) AS Cod_PubGoodsCode,
+			(SELECT top 1 Des_PubGoodsDesc FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) as Des_PubGoodsDesc,
+			1 StaInOut,
+			Tss_InvOutGo_Hd.SiInvInventory,
+			0 as SiCust
+		FROM         Tss_InvOutGo_Dt xx INNER JOIN
+            Tss_InvOutGo_Hd ON xx.SiInvOutGo_Hd = Tss_InvOutGo_Hd.SiInvOutGo_Hd
+		WHERE     
+			--(xx.SiPubGoods in (Select SiSel from dbo.Tss_StdStringSiFindUdf('+''''+@SiPubGoods+''''+')))  AND 
+			(Tss_InvOutGo_Hd.Dat_InvExitDate >=  '+''''+@SaleMaliStartDate+''''+') AND
+			(Tss_InvOutGo_Hd.Sta_InvOutBranch = 1) AND
+		    (Tss_InvOutGo_Hd.SiInvInventory = '+convert(varchar,@SiInvInventory)+')
+		GROUP BY xx.Num_Serial, xx.SiPubGoods, Tss_InvOutGo_Hd.SiInvInventory'
+
+		exec(@sqltxt)
+		exec(@sqltxt2)
+		--select * from #Temp
+	end
+End
+
+if (@Sta_PubPersonsGroup <> 8) and (@IsInvAdmin = 0)
+Begin
+	if @SiPubGoods<>''
+	begin
+		Set @SqlTxt=
+		'insert into #Temp 
+		SELECT     
+			xx.Num_Serial,
+			Sum(xx.Num_InvEntDetailGdsAmount) as moj1In,
+			0 moj1Out,
+			Sum(xx.Num_InvEntDetailGdsAmount2) as mojIn, 
+			0 as mojOut, 
+			xx.SiPubGoods,
+			(SELECT top 1 Cod_PubGoodsCode FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) as Cod_PubGoodsCode,
+			(SELECT top 1 Des_PubGoodsDesc FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) as Des_PubGoodsDesc,
+			0,
+			Tss_InvEntrance_Hd.SiInvInventory,
+			0 as SiCust
+		FROM        Tss_InvEntrance_Dt xx INNER JOIN
+							  Tss_InvEntrance_Hd ON xx.SiInvEntrance_Hd = Tss_InvEntrance_Hd.SiInvEntrance_Hd
+		WHERE    
+			(xx.SiPubGoods in (Select SiSel from dbo.Tss_StdStringSiFindUdf('+''''+@SiPubGoods+''''+')))  AND 
+			(Tss_InvEntrance_Hd.Dat_InvEnterDate >=  '+''''+@SaleMaliStartDate+''''+') AND
+			(Tss_InvEntrance_Hd.Sta_InvEntBranch = 0) AND
+		   (Tss_InvEntrance_Hd.SiInvInventory = 12)
+		GROUP BY xx.Num_Serial, xx.SiPubGoods, Tss_InvEntrance_Hd.SiInvInventory'
+
+		Set @SqlTxt2=
+		'insert into #Temp 
+		SELECT     
+			xx.Num_Serial, 
+			0 as moj1In, 
+			Sum(xx.Num_InvExtDetailGdsAmount) as moj1Out, 
+			0 AS MojIn, 
+			SUM(xx.Num_InvExtDetailGdsAmount2) AS MojOu, 
+			xx.SiPubGoods,
+            (SELECT top 1 Cod_PubGoodsCode FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) AS Cod_PubGoodsCode,
+			(SELECT top 1 Des_PubGoodsDesc FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) as Des_PubGoodsDesc,
+			1 StaInOut,
+			Tss_InvOutGo_Hd.SiInvInventory,
+			0 as SiCust
+		FROM         Tss_InvOutGo_Dt xx INNER JOIN
+                      Tss_InvOutGo_Hd ON xx.SiInvOutGo_Hd = Tss_InvOutGo_Hd.SiInvOutGo_Hd
+		WHERE     
+			(xx.SiPubGoods in (Select SiSel from dbo.Tss_StdStringSiFindUdf('+''''+@SiPubGoods+''''+')))  AND 
+			(Tss_InvOutGo_Hd.Dat_InvExitDate >=  '+''''+@SaleMaliStartDate+''''+') AND
+			(Tss_InvOutGo_Hd.Sta_InvOutBranch = 0) AND
+		    (Tss_InvOutGo_Hd.SiInvInventory = 12)
+		GROUP BY xx.Num_Serial, xx.SiPubGoods, Tss_InvOutGo_Hd.SiInvInventory'
+
+		exec(@sqltxt)
+		exec(@sqltxt2)
+		--select * from #Temp
+	end
+	
+
+	if @SiPubGoods=''
+	begin
+		Set @SqlTxt=
+		'insert into #Temp 
+		SELECT     
+			xx.Num_Serial,
+			Sum(xx.Num_InvEntDetailGdsAmount) as moj1In,
+			0 moj1Out,
+			Sum(xx.Num_InvEntDetailGdsAmount2) as mojIn, 
+			0 as mojOut, 
+			xx.SiPubGoods,
+			(SELECT top 1 Cod_PubGoodsCode FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) as Cod_PubGoodsCode,
+			(SELECT top 1 Des_PubGoodsDesc FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) as Des_PubGoodsDesc,
+			0,
+			Tss_InvEntrance_Hd.SiInvInventory,
+			0 as SiCust
+		FROM        Tss_InvEntrance_Dt xx INNER JOIN
+							  Tss_InvEntrance_Hd ON xx.SiInvEntrance_Hd = Tss_InvEntrance_Hd.SiInvEntrance_Hd
+		WHERE    
+			--(xx.SiPubGoods in (Select SiSel from dbo.Tss_StdStringSiFindUdf('+''''+@SiPubGoods+''''+')))  AND 
+			(Tss_InvEntrance_Hd.Dat_InvEnterDate >=  '+''''+@SaleMaliStartDate+''''+') AND
+			(Tss_InvEntrance_Hd.Sta_InvEntBranch = 0) AND
+		   (Tss_InvEntrance_Hd.SiInvInventory = 12)
+		GROUP BY xx.Num_Serial, xx.SiPubGoods, Tss_InvEntrance_Hd.SiInvInventory '
+
+		Set @SqlTxt2=
+		'insert into #Temp 
+		SELECT     
+			xx.Num_Serial, 
+			0 as moj1In, 
+			Sum(xx.Num_InvExtDetailGdsAmount) as moj1Out, 
+			0 AS MojIn, 
+			SUM(xx.Num_InvExtDetailGdsAmount2) AS MojOu, 
+			xx.SiPubGoods,
+            (SELECT top 1 Cod_PubGoodsCode FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) AS Cod_PubGoodsCode,
+			(SELECT top 1 Des_PubGoodsDesc FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) as Des_PubGoodsDesc,
+			1 StaInOut,
+			Tss_InvOutGo_Hd.SiInvInventory,
+			0 as SiCust
+		FROM         Tss_InvOutGo_Dt xx INNER JOIN
+                      Tss_InvOutGo_Hd ON xx.SiInvOutGo_Hd = Tss_InvOutGo_Hd.SiInvOutGo_Hd
+		WHERE     
+			--(xx.SiPubGoods in (Select SiSel from dbo.Tss_StdStringSiFindUdf('+''''+@SiPubGoods+''''+')))  AND 
+			(Tss_InvOutGo_Hd.Dat_InvExitDate >=  '+''''+@SaleMaliStartDate+''''+') AND
+			(Tss_InvOutGo_Hd.Sta_InvOutBranch = 0) AND
+		    (Tss_InvOutGo_Hd.SiInvInventory = 12)
+		GROUP BY xx.Num_Serial, xx.SiPubGoods, Tss_InvOutGo_Hd.SiInvInventory'
+
+		exec(@sqltxt)
+		exec(@sqltxt2)
+		--select * from #Temp
+	end
+
+		
+
+End
+
+if (@IsInvAdmin = 1)
+Begin
+	if @SiPubGoods<>''
+	Begin
+		Set @SqlTxt=
+		'insert into #Temp 
+		SELECT     
+			xx.Num_Serial,
+			Sum(xx.Num_InvEntDetailGdsAmount) as moj1In,
+			0 moj1Out,
+			Sum(xx.Num_InvEntDetailGdsAmount2) as mojIn, 
+			0 as mojOut, 
+			xx.SiPubGoods,
+			(SELECT top 1 Cod_PubGoodsCode FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) as Cod_PubGoodsCode,
+			(SELECT top 1 Des_PubGoodsDesc FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) as Des_PubGoodsDesc,
+			0,
+			Tss_InvEntrance_Hd.SiInvInventory,
+			0 as SiCust
+		FROM        Tss_InvEntrance_Dt xx INNER JOIN
+							  Tss_InvEntrance_Hd ON xx.SiInvEntrance_Hd = Tss_InvEntrance_Hd.SiInvEntrance_Hd
+		WHERE    
+			(xx.SiPubGoods in (Select SiSel from dbo.Tss_StdStringSiFindUdf('+''''+@SiPubGoods+''''+')))  AND 
+			(Tss_InvEntrance_Hd.Dat_InvEnterDate >=  '+''''+@SaleMaliStartDate+''''+') AND
+		   (Tss_InvEntrance_Hd.SiInvInventory = '+convert(varchar,@SiInvInventory)+')
+		GROUP BY xx.Num_Serial, xx.SiPubGoods, Tss_InvEntrance_Hd.SiInvInventory
+		having Sum(xx.Num_InvEntDetailGdsAmount)>0 
+
+		union all
+		
+		SELECT     
+			xx.Num_Serial, 
+			0 as moj1In, 
+			Sum(xx.Num_InvExtDetailGdsAmount) as moj1Out, 
+			0 AS MojIn, 
+			SUM(xx.Num_InvExtDetailGdsAmount2) AS MojOu, 
+			xx.SiPubGoods,
+            (SELECT top 1 Cod_PubGoodsCode FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) AS Cod_PubGoodsCode,
+			(SELECT top 1 Des_PubGoodsDesc FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) as Des_PubGoodsDesc,
+			1,
+			Tss_InvOutGo_Hd.SiInvInventory,
+			0 as SiCust
+		FROM         Tss_InvOutGo_Dt xx INNER JOIN
+                      Tss_InvOutGo_Hd ON xx.SiInvOutGo_Hd = Tss_InvOutGo_Hd.SiInvOutGo_Hd
+		WHERE     
+			(xx.SiPubGoods in (Select SiSel from dbo.Tss_StdStringSiFindUdf('+''''+@SiPubGoods+''''+')))  AND 
+			(Tss_InvOutGo_Hd.Dat_InvExitDate >=  '+''''+@SaleMaliStartDate+''''+') AND
+		    (Tss_InvOutGo_Hd.SiInvInventory = '+convert(varchar,@SiInvInventory)+')
+		GROUP BY xx.Num_Serial, xx.SiPubGoods, Tss_InvOutGo_Hd.SiInvInventory
+		having Sum(xx.Num_InvExtDetailGdsAmount)>0 '
+		
+		exec(@sqltxt)
+		--select * from #Temp
+	end
+	
+	if @SiPubGoods=''
+	Begin
+		Set @SqlTxt=
+		'insert into #Temp 
+		SELECT     
+			xx.Num_Serial,
+			Sum(xx.Num_InvEntDetailGdsAmount) as moj1In,
+			0 moj1Out,
+			Sum(xx.Num_InvEntDetailGdsAmount2) as mojIn, 
+			0 as mojOut, 
+			xx.SiPubGoods,
+			(SELECT top 1 Cod_PubGoodsCode FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) as Cod_PubGoodsCode,
+			(SELECT top 1 Des_PubGoodsDesc FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) as Des_PubGoodsDesc,
+			0 StaInOut,
+			Tss_InvEntrance_Hd.SiInvInventory,
+			0 as SiCust
+		FROM Tss_InvEntrance_Dt xx INNER JOIN
+							  Tss_InvEntrance_Hd ON xx.SiInvEntrance_Hd = Tss_InvEntrance_Hd.SiInvEntrance_Hd
+		WHERE    
+			--(xx.SiPubGoods in (Select SiSel from dbo.Tss_StdStringSiFindUdf('+''''+@SiPubGoods+''''+')))  AND 
+			(Tss_InvEntrance_Hd.Dat_InvEnterDate >=  '+''''+@SaleMaliStartDate+''''+') AND
+		   (Tss_InvEntrance_Hd.SiInvInventory = '+convert(varchar,@SiInvInventory)+')
+		GROUP BY xx.Num_Serial, xx.SiPubGoods, Tss_InvEntrance_Hd.SiInvInventory
+		having Sum(xx.Num_InvEntDetailGdsAmount)>0 
+
+		union all
+
+		SELECT     
+			xx.Num_Serial, 
+			0 as moj1In, 
+			Sum(xx.Num_InvExtDetailGdsAmount) as moj1Out, 
+			0 AS MojIn, 
+			SUM(xx.Num_InvExtDetailGdsAmount2) AS MojOu, 
+			xx.SiPubGoods,
+            (SELECT top 1 Cod_PubGoodsCode FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) AS Cod_PubGoodsCode,
+			(SELECT top 1 Des_PubGoodsDesc FROM Tss_PubGoodsViw WHERE (SiPubGoods = xx.SiPubGoods)) as Des_PubGoodsDesc,
+			1 StaInOut,
+			Tss_InvOutGo_Hd.SiInvInventory,
+			0 as SiCust
+		FROM         Tss_InvOutGo_Dt xx INNER JOIN
+                      Tss_InvOutGo_Hd ON xx.SiInvOutGo_Hd = Tss_InvOutGo_Hd.SiInvOutGo_Hd
+		WHERE     
+			(Tss_InvOutGo_Hd.Dat_InvExitDate >=  '+''''+@SaleMaliStartDate+''''+') AND
+		    (Tss_InvOutGo_Hd.SiInvInventory = '+convert(varchar,@SiInvInventory)+')
+		GROUP BY xx.Num_Serial, xx.SiPubGoods, Tss_InvOutGo_Hd.SiInvInventory
+		having Sum(xx.Num_InvExtDetailGdsAmount)>0 '
+
+		exec(@sqltxt)
+--		exec(@sqltxt2)
+		--select * from #Temp
+	end
+End
+
+--select * from #Temp where Num_Serial='5721080462'
+
+Set @SqlTxt = '
+Select
+	Num_Serial,
+	SummojW, 
+	SumMojRole,
+	Cod_PubGoodsCode,
+	SiPubGoods,
+	Des_PubGoodsDesc,
+	SiInvInventory,
+	CAST(0.0 AS NUMERIC(18, 2)) sicust,
+	CAST(0.0 AS NUMERIC(18, 2)) SiCustCode,
+	'''' SiCustDesc,
+	CAST(0.0 AS NUMERIC(18, 2)) GdsArea,
+	CAST(0.0 AS NUMERIC(18, 2)) MojoodiArea,
+	CAST(0.0 AS NUMERIC(18, 2)) as GdsGramage,
+	CAST(0.0 AS NUMERIC(18, 2)) as Gramage,
+	'''' DeliDate,
+	'''' as GdsFlute,
+	'''' UnitSpec1,
+	'''' UnitSpec2,
+	CAST(0.0 AS NUMERIC(18, 2)) OrderPoint,
+	CAST(0.0 AS NUMERIC(18, 2)) OrderPoint2,
+	CAST(0.0 AS NUMERIC(18, 2)) Num_FirstOfPeriodSupply,
+	CAST(0.0 AS NUMERIC(18, 2)) sumVaredeh,
+	CAST(0.0 AS NUMERIC(18, 2)) sumSadereh,
+	CAST(0.0 AS NUMERIC(18, 2)) MojoodiBase,
+	CAST(0.0 AS NUMERIC(18, 2)) MojoodiSecond,
+	'''' MazContBuyReq,
+	CAST(0.0 AS NUMERIC(18, 2))  SiRelatedSaler,
+	'''' GdsType,
+	'''' ContCod,
+	'''' CustDesc,
+	'''' CustCode,
+	'''' Rang,
+	'''' arz,
+	'''' Jens,
+	'''' Grouh,
+	'''' CodeContBuyReq,
+	'''' CustContBuyReq,
+	'''' ContDesc,
+	'''' RelatedSaler,
+	'''' LastSanadCode,
+	'''' LastSanadDate,
+	'''' DiffBetweenLastAndBuy,
+	CAST(0.0 AS NUMERIC(18, 2)) LastSanadAmt,
+	'''' SanadType,
+	'''' LastGdsBuyDate,
+	CAST(0.0 AS NUMERIC(18, 2)) MojoodiTonage
+
+From
+(
+Select
+	*
+From
+(
+select 
+	Num_Serial,
+	Sum(moj1In)-Sum(moj1Out) SummojW, 
+	Sum(MojIn) -Sum(MojOut) SumMojRole,
+	Cod_PubGoodsCode,
+	SiPubGoods,
+	Des_PubGoodsDesc,
+	SiInvInventory
+from 
+	#Temp 
+group by
+	Num_Serial, 
+	Cod_PubGoodsCode, 
+	SiPubGoods, 
+	Des_PubGoodsDesc, 
+	SiInvInventory
+having 
+	(Sum(moj1In)-Sum(moj1Out)>0) '
+
+
+print   @SqlTxt+'
+   ) Ccc '+@InternalWhere+'
+) CalcSel  ' + @Where + @Order
+
+--Exec('select * from #Temp')
+
+Exec(
+   @SqlTxt+'
+   ) Ccc  '+@InternalWhere+'
+) CalcSel  ' + @Where + @Order)
+
+GO
+
+alter Procedure Tss_PurUntInvoice_DtIudStp
+(
+	@Err_Code Int OutPut,
+	@SiPurInvoice_Dt Numeric OutPut,
+	@SiPubGoods numeric=null,
+	@SiPurInvoice_Hd numeric,
+	@SiPubCustomCodes numeric=null,
+	@Cod_PurInvoiceDtCode varchar(50)='',
+	@Des_PurInvoiceDtDesc varchar(500)='',
+	@Num_PurInvoiceDtGoodsAmt decimal(30,4)=0,
+	@Num_PurInvoiceDtGoodsFee numeric=0,
+	@Num_PurInvoiceDtServiceNo decimal(30,4)=0,
+	@Num_PurInvoiceDtServiceFee numeric=0,
+	@Num_PurInvoiceDtGoodsFeeNonCalc decimal(34,18)=0,
+	@Num_PurInvoiceDtdiscountAmt numeric=0,
+	@Num_PurInvoiceDtTotalAmt numeric=0,
+	@Sta_BuyServiceOrGds smallint=null,
+	@SiInvEntrance_Dt numeric=0,
+	@Num_PurInvoiceDtAddedTax decimal(34,18)=0,
+	@Num_VaraghFee decimal(30,4)=0,
+	@SiPubCostCenter numeric=null,
+	@SiPurPurchOrder_Dt numeric=null,
+	@StmPurInvoice_Dt TimeStamp=0,
+	@SiUser Numeric,
+	@FlgInsUpdDel SmallInt
+) As
+
+Set arithabort ON
+Set concat_null_yields_null ON
+Set ansi_nulls ON
+Set ansi_null_dflt_on ON
+Set ansi_padding ON
+Set ansi_warnings ON
+Set quoted_identifier ON
+
+declare
+	@SiInvEntrance_Hd numeric,
+	@Num_InvEntDetailGdsAmount decimal(30,4)
+
+if isnull(@Cod_PurInvoiceDtCode,'')=''
+	SELECT    
+		@Cod_PurInvoiceDtCode = Convert(varchar,Isnull(Max(Convert(numeric,isnull(Cod_PurInvoiceDtCode,0))),0)+1)
+	FROM         
+		Tss_PurInvoice_Dt
+	Where
+		SiPurInvoice_Hd = @SiPurInvoice_Hd
+
+Select 
+	@SiInvEntrance_Hd = SiInvEntrance_Hd,
+	@Num_InvEntDetailGdsAmount = isnull(Num_InvEntDetailGdsAmount,0) 
+from 
+	dbo.Tss_InvEntrance_Dt 
+where 
+	SiInvEntrance_Dt = @SiInvEntrance_Dt
+
+If
+@FlgInsUpdDel=0
+Begin
+	Insert Into dbo.Tss_PurInvoice_Dt
+	(
+		SiPubGoods,
+		SiPurInvoice_Hd,
+		SiPubCustomCodes,
+		Cod_PurInvoiceDtCode,
+		Des_PurInvoiceDtDesc,
+		Num_PurInvoiceDtGoodsAmt,
+--		Num_PurInvoiceDtGoodsFee,
+--		Num_PurInvoiceDtdiscountAmt,
+		Num_PurInvoiceDtTotalAmt,
+		Num_PurInvoiceDtServiceNo,
+--		Num_PurInvoiceDtServiceFee,
+		Sta_BuyServiceOrGds,
+		SiInvEntrance_Dt,		
+		Num_PurInvoiceDtAddedTax,
+		SiPubCostCenter,
+		Num_PurInvoiceDtGoodsFeeNonCalc,
+		SiPurPurchOrder_Dt
+	)
+	Values
+	(
+		@SiPubGoods,
+		@SiPurInvoice_Hd,
+		@SiPubCustomCodes,
+		@Cod_PurInvoiceDtCode,
+		@Des_PurInvoiceDtDesc,
+		@Num_PurInvoiceDtGoodsAmt,
+--		@Num_PurInvoiceDtGoodsFee,
+--		@Num_PurInvoiceDtdiscountAmt,
+		@Num_PurInvoiceDtTotalAmt,
+		@Num_PurInvoiceDtServiceNo,
+--		@Num_PurInvoiceDtServiceFee,
+		@Sta_BuyServiceOrGds,
+		@SiInvEntrance_Dt,		
+		@Num_PurInvoiceDtAddedTax,
+		@SiPubCostCenter,
+		@Num_PurInvoiceDtGoodsFeeNonCalc,
+		@SiPurPurchOrder_Dt
+	)
+		if @Num_PurInvoiceDtGoodsAmt=@Num_InvEntDetailGdsAmount
+		UPDATE    
+			Tss_InvEntrance_Dt
+		SET              
+			Num_InvEntDetailRialFee = @Num_PurInvoiceDtGoodsFeeNonCalc,
+			Num_TaxFee = @Num_PurInvoiceDtAddedTax/@Num_PurInvoiceDtGoodsAmt,
+			Num_VaredehRialiAmt = (round(((isnull(@Num_PurInvoiceDtGoodsFeeNonCalc,0) + isnull(Num_TransportCostFee,0) + isnull(@Num_PurInvoiceDtAddedTax/@Num_PurInvoiceDtGoodsAmt,0)) * @Num_InvEntDetailGdsAmount),0))
+		WHERE 
+			(SiInvEntrance_Dt = @SiInvEntrance_Dt)
+
+		if @Num_PurInvoiceDtGoodsAmt>@Num_InvEntDetailGdsAmount
+		UPDATE    
+			Tss_InvEntrance_Dt
+		SET              
+			Num_InvEntDetailRialFee = @Num_PurInvoiceDtGoodsFeeNonCalc,
+			Num_TaxFee = @Num_PurInvoiceDtAddedTax/@Num_PurInvoiceDtGoodsAmt, 
+			Num_VaredehRialiAmt = (round(((isnull(@Num_PurInvoiceDtGoodsFeeNonCalc,0) + isnull(Num_TransportCostFee,0) + isnull(@Num_PurInvoiceDtAddedTax/@Num_PurInvoiceDtGoodsAmt,0)) * @Num_InvEntDetailGdsAmount),0))
+		WHERE 
+			(SiInvEntrance_Hd = @SiInvEntrance_Hd) and
+			(SiPubGoods = @SiPubGoods)
+
+	Set @SiPurInvoice_Dt=Scope_Identity()
+	If IsNull(@SiPurInvoice_Dt,0)=0
+	Begin
+		Set @SiPurInvoice_Dt=0
+		Set @Err_Code=400
+	End
+	Return
+End
+
+If @FlgInsUpdDel=1
+Begin
+	Set @Err_Code=0
+	If Exists(
+	Select StmPurInvoice_Dt From dbo.Tss_PurInvoice_Dt
+	Where (SiPurInvoice_Dt=@SiPurInvoice_Dt) And (StmPurInvoice_Dt=@StmPurInvoice_Dt))
+	Begin
+		print 'amadam dakhel'
+		Update dbo.Tss_PurInvoice_Dt Set
+			SiPubGoods=@SiPubGoods,
+			SiPurInvoice_Hd=@SiPurInvoice_Hd,
+			SiPubCustomCodes=@SiPubCustomCodes,
+			Cod_PurInvoiceDtCode=@Cod_PurInvoiceDtCode,
+			Des_PurInvoiceDtDesc=@Des_PurInvoiceDtDesc,
+			Num_PurInvoiceDtGoodsAmt=@Num_PurInvoiceDtGoodsAmt,
+--			Num_PurInvoiceDtGoodsFee=@Num_PurInvoiceDtGoodsFee,
+--			Num_PurInvoiceDtdiscountAmt=@Num_PurInvoiceDtdiscountAmt,
+			Num_PurInvoiceDtTotalAmt=@Num_PurInvoiceDtTotalAmt,
+			Num_PurInvoiceDtServiceNo=@Num_PurInvoiceDtServiceNo,
+--			Num_PurInvoiceDtServiceFee=@Num_PurInvoiceDtServiceFee,
+			Sta_BuyServiceOrGds=@Sta_BuyServiceOrGds,
+			SiInvEntrance_Dt=@SiInvEntrance_Dt,			
+			Num_PurInvoiceDtAddedTax=@Num_PurInvoiceDtAddedTax,
+			SiPubCostCenter=@SiPubCostCenter,
+			Num_PurInvoiceDtGoodsFeeNonCalc=@Num_PurInvoiceDtGoodsFeeNonCalc,
+			SiPurPurchOrder_Dt=@SiPurPurchOrder_Dt
+		Where (SiPurInvoice_Dt=@SiPurInvoice_Dt)
+
+		if @Num_PurInvoiceDtGoodsAmt=@Num_InvEntDetailGdsAmount
+		UPDATE    
+			Tss_InvEntrance_Dt
+		SET              
+			Num_InvEntDetailRialFee = @Num_PurInvoiceDtGoodsFeeNonCalc,
+			Num_TaxFee = @Num_PurInvoiceDtAddedTax/@Num_PurInvoiceDtGoodsAmt,
+			Num_VaredehRialiAmt = (round(((isnull(@Num_PurInvoiceDtGoodsFeeNonCalc,0) + isnull(Num_TransportCostFee,0) + isnull(@Num_PurInvoiceDtAddedTax/@Num_PurInvoiceDtGoodsAmt,0)) * @Num_InvEntDetailGdsAmount),0))
+		WHERE 
+			(SiInvEntrance_Dt = @SiInvEntrance_Dt)
+
+		if @Num_PurInvoiceDtGoodsAmt>@Num_InvEntDetailGdsAmount
+		UPDATE    
+			Tss_InvEntrance_Dt
+		SET              
+			Num_InvEntDetailRialFee = @Num_PurInvoiceDtGoodsFeeNonCalc,
+			Num_TaxFee = @Num_PurInvoiceDtAddedTax/@Num_PurInvoiceDtGoodsAmt, 
+			Num_VaredehRialiAmt = (round(((isnull(@Num_PurInvoiceDtGoodsFeeNonCalc,0) + isnull(Num_TransportCostFee,0) + isnull(@Num_PurInvoiceDtAddedTax/@Num_PurInvoiceDtGoodsAmt,0)) * @Num_InvEntDetailGdsAmount),0))
+		WHERE 
+			(SiInvEntrance_Hd = @SiInvEntrance_Hd) and
+			(SiPubGoods = @SiPubGoods)
+
+		Set @Err_Code=@@Error
+		If @Err_Code<>0
+			Set @Err_Code=401
+		Return
+	End
+	ELse
+		Set @Err_Code=402
+End
+
+If @FlgInsUpdDel=2
+Begin
+	Set @Err_Code=0
+	If 
+Exists(
+	Select StmPurInvoice_Dt From dbo.Tss_PurInvoice_Dt
+	Where (SiPurInvoice_Dt=@SiPurInvoice_Dt) And (StmPurInvoice_Dt=@StmPurInvoice_Dt))
+	Begin
+
+		Delete From dbo.Tss_PurInvoice_Dt
+		Where (SiPurInvoice_Dt=@SiPurInvoice_Dt)
+
+		if @Num_PurInvoiceDtGoodsAmt=@Num_InvEntDetailGdsAmount
+		UPDATE    
+			Tss_InvEntrance_Dt
+		SET              
+			Num_InvEntDetailRialFee = 0,
+			Num_TaxFee = 0,
+			Num_VaredehRialiAmt = 0
+		WHERE 
+			(SiInvEntrance_Dt = @SiInvEntrance_Dt)
+
+		if @Num_PurInvoiceDtGoodsAmt>@Num_InvEntDetailGdsAmount
+		UPDATE    
+			Tss_InvEntrance_Dt
+		SET              
+			Num_InvEntDetailRialFee = 0,
+			Num_TaxFee = 0,
+			Num_VaredehRialiAmt = 0
+		WHERE 
+			(SiInvEntrance_Hd = @SiInvEntrance_Hd) and
+			(SiPubGoods=@SiPubGoods)
+
+		Set @Err_Code=@@Error
+	
+	If @Err_Code<>0
+			Set @Err_Code=4000
+	End
+	Else
+		Set @Err_Code=4001
+	Return
+End
+
+Go
