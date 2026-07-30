@@ -14,6 +14,115 @@ GO
 SET NOCOUNT ON
 GO
 
+-- ============================================================
+-- Script: Change Num_Serial from BIGINT to DECIMAL(21,0)
+-- Table: Tss_InvEntrance_Dt
+-- Description: Only alters the column if it's currently BIGINT
+-- ============================================================
+
+IF EXISTS (
+    SELECT 1 
+    FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_SCHEMA = 'dbo' 
+        AND TABLE_NAME = 'Tss_InvEntrance_Dt' 
+        AND COLUMN_NAME = 'Num_Serial'
+        AND DATA_TYPE = 'bigint'
+)
+BEGIN
+    -- Check if the column has a default constraint and drop it if exists
+    DECLARE @DefaultConstraintName NVARCHAR(128)
+    
+    SELECT @DefaultConstraintName = dc.name
+    FROM sys.default_constraints dc
+    INNER JOIN sys.columns c ON dc.parent_column_id = c.column_id
+    INNER JOIN sys.objects o ON dc.parent_object_id = o.object_id
+    WHERE o.name = 'Tss_InvEntrance_Dt' AND c.name = 'Num_Serial'
+    
+    IF @DefaultConstraintName IS NOT NULL
+    BEGIN
+        DECLARE @DropConstraintSQL NVARCHAR(MAX)
+        SET @DropConstraintSQL = 'ALTER TABLE dbo.Tss_InvEntrance_Dt DROP CONSTRAINT ' + QUOTENAME(@DefaultConstraintName)
+        EXEC sp_executesql @DropConstraintSQL
+    END
+    
+    -- Change column from BIGINT to DECIMAL(21,0)
+    ALTER TABLE dbo.Tss_InvEntrance_Dt 
+    ALTER COLUMN Num_Serial DECIMAL(21,0) NULL
+END
+ELSE IF EXISTS (
+    SELECT 1 
+    FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_SCHEMA = 'dbo' 
+        AND TABLE_NAME = 'Tss_InvEntrance_Dt' 
+        AND COLUMN_NAME = 'Num_Serial'
+        AND DATA_TYPE = 'decimal'
+        AND NUMERIC_PRECISION = 21
+        AND NUMERIC_SCALE = 0
+)
+BEGIN
+    PRINT 'Num_Serial is already DECIMAL(21,0). No action needed.'
+END
+ELSE
+BEGIN
+    PRINT 'Num_Serial is either not BIGINT or column does not exist.'
+END
+
+GO
+
+-- ============================================================
+-- Script: Change Num_Serial from BIGINT to DECIMAL(21,0)
+-- Table: Tss_InvOutGo_Dt
+-- Description: Only alters the column if it's currently BIGINT
+-- ============================================================
+
+IF EXISTS (
+    SELECT 1 
+    FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_SCHEMA = 'dbo' 
+        AND TABLE_NAME = 'Tss_InvOutGo_Dt' 
+        AND COLUMN_NAME = 'Num_Serial'
+        AND DATA_TYPE = 'bigint'
+)
+BEGIN
+    -- Check if the column has a default constraint and drop it if exists
+    DECLARE @DefaultConstraintName NVARCHAR(128)
+    
+    SELECT @DefaultConstraintName = dc.name
+    FROM sys.default_constraints dc
+    INNER JOIN sys.columns c ON dc.parent_column_id = c.column_id
+    INNER JOIN sys.objects o ON dc.parent_object_id = o.object_id
+    WHERE o.name = 'Tss_InvOutGo_Dt' AND c.name = 'Num_Serial'
+    
+    IF @DefaultConstraintName IS NOT NULL
+    BEGIN
+        DECLARE @DropConstraintSQL NVARCHAR(MAX)
+        SET @DropConstraintSQL = 'ALTER TABLE dbo.Tss_InvOutGo_Dt DROP CONSTRAINT ' + QUOTENAME(@DefaultConstraintName)
+        EXEC sp_executesql @DropConstraintSQL
+    END
+    
+    -- Change column from BIGINT to DECIMAL(21,0)
+    ALTER TABLE dbo.Tss_InvOutGo_Dt 
+    ALTER COLUMN Num_Serial DECIMAL(21,0) NULL
+END
+ELSE IF EXISTS (
+    SELECT 1 
+    FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_SCHEMA = 'dbo' 
+        AND TABLE_NAME = 'Tss_InvOutGo_Dt' 
+        AND COLUMN_NAME = 'Num_Serial'
+        AND DATA_TYPE = 'decimal'
+        AND NUMERIC_PRECISION = 21
+        AND NUMERIC_SCALE = 0
+)
+BEGIN
+    PRINT 'Num_Serial is already DECIMAL(21,0). No action needed.'
+END
+ELSE
+BEGIN
+    PRINT 'Num_Serial is either not BIGINT or column does not exist.'
+END
+
+GO
 
 -- Add Tss_SalInvoice_Hd if it doesn't exist
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'Tss_SalInvoice_Hd' AND COLUMN_NAME = 'Sta_ContIsLaminate')
