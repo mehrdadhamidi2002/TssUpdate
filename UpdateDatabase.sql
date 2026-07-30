@@ -7801,3 +7801,26 @@ From
 delete @TempTable
 
 GO
+
+alter Procedure Tss_SalApproveContractStp  
+(  
+ @SiSalInvoice_Hd Numeric,
+ @Sta_ContractStatus smallint
+)   
+As  
+
+if not exists
+(
+SELECT     *
+FROM         Tss_SalInvoice_Dt INNER JOIN
+                      Tss_PrcProdProgram_Dt ON Tss_SalInvoice_Dt.SiSalInvoice_Dt = Tss_PrcProdProgram_Dt.SiSalInvoice_DtNo1
+WHERE     (Tss_SalInvoice_Dt.SiSalInvoice_Hd = @SiSalInvoice_Hd)
+)
+Update dbo.Tss_SalInvoice_Hd   
+ Set 
+    Sta_ContractStatus=@Sta_ContractStatus, 
+    Dat_ApprovedForProd=dbo.Tss_StdShamsiToday(GETDATE()),
+    Dat_SalConfirmOfProdDate=dbo.Tss_StdShamsiToday(GETDATE())
+ Where SiSalInvoice_Hd=@SiSalInvoice_Hd
+
+GO
