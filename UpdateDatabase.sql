@@ -9199,7 +9199,7 @@ FROM            dbo.Tss_InvEntrance_Dt INNER JOIN
 
 GO
 
-alter PROCEDURE Tss_InvUntEntrancesVStp
+create PROCEDURE Tss_InvUntEntrancesVStp
 (  
 	@InternalWhere VarChar(8000)='',  
 	@Where VarChar(8000)='',  
@@ -9254,5 +9254,4 @@ FROM            Tss_InvEntrance_Dt INNER JOIN
                          Tss_PubPersonsViw AS Saler ON Tss_InvEntrance_Hd.SiPubPersonsSpec = Saler.SiPubPersonsSpec
                            ) Ccc  '+@InternalWhere+'
 ) CalcSel ' + @Where + @Order
-print @sql
 exec (@Sql)
