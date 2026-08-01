@@ -8649,3 +8649,529 @@ Exec(
 		('+@SqlTxt+') Calc '+@InternalWhere +') CalcSel '+ @Where + @Order)
 
 GO
+
+CREATE proc Tss_InvBuyReqsRepStp
+(
+	@InternalWhere VarChar(8000)='',
+	@Where VarChar(8000)='',
+	@Order VarChar(8000)='',
+    @SiUser numeric=1,
+	@StartDate varchar(10)='1400/05/01',
+	@EndDate varchar(10)='1400/05/13',
+	@SiPubGoods varchar(8000)='',
+	@SiPubPersonsSpec varchar(8000)='',
+	@SiInvInventory varchar(8000)='',
+	@FlagMandeh smallint=1,
+	@FlagNotCanceled smallint=1,
+	@FlagNotCompleted smallint=1,
+	@FalgCalcFields smallint=1,
+	@FlagGoods smallint=1,
+	@FlagServices smallint=1,
+	@FlagUnit smallint=15
+) AS 
+
+Set arithabort ON
+Set concat_null_yields_null ON
+Set ansi_nulls ON
+Set ansi_null_dflt_on ON
+Set ansi_padding ON
+Set ansi_warnings ON
+Set quoted_identifier ON
+
+Declare
+	@TempWhere  VarChar(8000)
+
+Set @TempWhere = ''
+
+If @InternalWhere<>'' 
+	Set @InternalWhere=' Where '+@InternalWhere
+
+if (@FlagMandeh=1) 
+	if (@TempWhere<>'')
+		Set @TempWhere=' and (BuyMandeh>0) '
+	else
+		Set @TempWhere=' Where (BuyMandeh>0) '
+
+if (@FlagNotCanceled=1) 
+	if (@TempWhere<>'')
+		Set @TempWhere= @TempWhere + ' and (Sta_BuyReqDtCancel<>2) '
+	else
+		Set @TempWhere= @TempWhere + ' where (Sta_BuyReqDtCancel<>2) '
+
+
+if @Where<>''
+	Set @Where = ' Where '+@Where
+Else
+	Set @Where = @TempWhere
+
+
+If @Order<>'' 
+	Set @Order=' Order By '+@Order
+Else
+	Set @Order=' Order By Dat_BuyReqHdDate '
+
+Declare
+	@Sql Varchar(8000),
+	@SqlFinal Varchar(8000),
+	@Sta_PubPersonsGroup smallint,
+	@IsInvAdmin smallint
+
+Select @IsInvAdmin = dbo.Tss_StdFindIfUserIsInGroup(@SiUser,'InvAdmin')
+
+
+SELECT     
+	@Sta_PubPersonsGroup = Sta_PubPersonsGroup
+FROM         
+	Tss_PubPersonsSpec
+WHERE     
+	(SiPubPersonsSpec = @SiUser)
+
+
+--if dbo.Tss_StdFindSubLoc(0)<>'Caspian'
+if exists (SELECT * FROM tempdb.dbo.sysobjects WHERE (name = '##InvBuyReqsRepTemp'))
+	drop table ##InvBuyReqsRepTemp
+
+
+Set @Sql =
+'
+SELECT distinct  
+	ReqHd.Sta_Priority,
+	ReqDt.SiInvBuyReq_Dt, 
+	ReqDt.SiInvBuyReq_Hd, 
+	ReqDt.SiPubGoods, 
+	ReqDt.SiPubCustomCodes, 
+	ReqDt.Sta_BuyReqServiceOrGds, 
+	ReqDt.Dat_BuyReqNeeddate, 
+	ReqDt.Cod_BuyReqDtCode, 
+	ReqDt.Des_BuyReDtDesc, 
+	ReqDt.Num_BuyReqN, 
+	ReqDt.Num_BuyReqW, 
+	ReqDt.Num_BuyReqM, 
+	ReqDt.Sta_BuyReqDtCancel, 
+	ReqDt.Num_BuyReqOrdered, 
+	ReqDt.Sta_RequestorSection, 
+	ReqDt.Des_ConsumCenter, 
+	ReqHd.Cod_BuyReqHdCode, 
+	ReqHd.Dat_BuyReqHdDate, 
+	ReqHd.Sta_BuyReqHdCancel, 
+	ReqHd.Dat_BuyReqHdCancelDate, 
+	ReqHd.Dat_BuyReqHdConfirmDate, 
+	ReqHd.Des_BuyReqHdDesc, 
+	ReqHd.Dat_BuyReqHdRegDate, 
+	ReqHd.SiInvInventory, 
+	ReqHd.Sta_IsPrinted, 
+	ReqHd.SiPubSubLocations, 
+	Gds.Cod_PubGoodsCode, 
+	Gds.Des_PubGoodsDesc, 
+	Gds.SiPubUnitSpecs1, 
+	Unit.Cod_PubUnitCode, 
+	Unit.Des_PubUnitDesc, 
+	Inv.Cod_InvInventoryCode, 
+	Inv.Des_InvInventoryDesc, 
+	SubLoc.Cod_SubLocCode, 
+	SubLoc.Des_SubLocName, 
+	Pcc.Cod_CustomCodesCode, 
+	Pcc.Des_CustomCodesDesc,
+	ReqHd.StaBuyReqBranch,
+	ReqHd.Cod_ReqestCode, 
+	ReqHd.Mdt_BuyReqHdRegister, 
+	ReqHd.Mdt_BuyReqHdReqManager, 
+	ReqHd.Mdt_BuyReqHdReqBoss, 
+	ReqHd.Mdt_BuyReqHdReqPurchBoss, 
+	ReqHd.Mdt_BuyReqHdReqPurchCommittee, 
+	ReqHd.Sta_Section,
+	ReqHd.Cod_ExitPass, 
+	Tss_PubPersonsViw.Cod_PubPersonCode, 
+	Tss_PubPersonsViw.Des_FullName,
+	isnull(ReqDt.Num_VaraghLength,0) Num_VaraghLength, 
+	isnull(ReqDt.Num_VaraghWidth,0) Num_VaraghWidth, 
+	ReqDt.Num_VaraghFee,
+	ReqDt.Dat_BuyReqDtCancelDate,
+	Unit.Sta_PubUnitType,
+	Tss_SalInvoice_Hd.Cod_SaleAgreement2,
+	Tss_SalInvoice_Hd.Dat_SalReqToContractDate, 
+	Tss_PubGoods.Cod_PubGoodsCode CodeContGds, 
+	Tss_PubGoods.Des_PubGoodsDesc DescContGds, 
+	Tss_PubCustomCodes.Cod_CustomCodesCode CodeContGdsMaz, 
+	Tss_PubCustomCodes.Des_CustomCodesDesc DescContGdsMaz,
+	Tss_PubPersonsViw.Cod_PubPersonCode CustCode, 
+	Tss_PubPersonsViw.Des_FullName CustDesc, 
+	Tss_PrcFlutType.Cod_FlutTypeCode, 
+	Tss_PrcFlutType.Des_FlutTypeName, 
+	Tss_PubGoodsClassify.Cod_GoodsClassCode,
+	Tss_PubGoodsClassify.Des_GoodsClassDesc,
+	Gds.Num_GdsLength, 
+	Gds.Num_GdsWidth,
+	ReqHd.Des_SalerContCode,
+	Tss_PubPersonsViw_1.Cod_PubPersonCode SellerCode,
+	Tss_PubPersonsViw_1.Des_FullName SellerDesc
+
+INTO ##InvBuyReqsRepTemp
+FROM           
+	Tss_PubGoodsClassify RIGHT OUTER JOIN
+	Tss_PubGoods AS Gds ON Tss_PubGoodsClassify.SiPubGoodsClassify = Gds.SiJens LEFT OUTER JOIN
+	Tss_PrcFlutType ON Gds.SiFlut = Tss_PrcFlutType.SiPrcFlutType RIGHT OUTER JOIN
+	Tss_SalInvoice_Hd INNER JOIN
+	Tss_SalInvoice_Dt ON Tss_SalInvoice_Hd.SiSalInvoice_Hd = Tss_SalInvoice_Dt.SiSalInvoice_Hd INNER JOIN
+	Tss_PubGoods ON Tss_SalInvoice_Dt.SiPubGoods = Tss_PubGoods.SiPubGoods INNER JOIN
+	Tss_PubUnitSpecs AS Unit ON Tss_PubGoods.SiPubUnitSpecs1 = Unit.SiPubUnitSpecs INNER JOIN
+	Tss_PubCustomCodes ON Tss_SalInvoice_Dt.SiPubCustomCodes = Tss_PubCustomCodes.SiPubCustomCodes INNER JOIN
+	Tss_PubPersonsViw ON Tss_SalInvoice_Hd.SiPubPersonsSpec = Tss_PubPersonsViw.SiPubPersonsSpec RIGHT OUTER JOIN
+	Tss_InvBuyReq_Dt AS ReqDt INNER JOIN
+	Tss_InvBuyReq_Hd AS ReqHd ON ReqDt.SiInvBuyReq_Hd = ReqHd.SiInvBuyReq_Hd INNER JOIN
+	Tss_InvInventory AS Inv ON ReqHd.SiInvInventory = Inv.SiInvInventory ON Tss_SalInvoice_Dt.SiSalInvoice_Dt = ReqDt.SiContractDt LEFT OUTER JOIN
+	Tss_PubCustomCodes AS Pcc ON ReqDt.SiPubCustomCodes = Pcc.SiPubCustomCodes LEFT OUTER JOIN
+	Tss_PubPersonsViw AS Tss_PubPersonsViw_1 ON ReqHd.SiPubPersonsSpec = Tss_PubPersonsViw_1.SiPubPersonsSpec ON Gds.SiPubGoods = ReqDt.SiPubGoods LEFT OUTER JOIN
+	Tss_PubSubLocations AS SubLoc ON ReqHd.SiPubSubLocations = SubLoc.SiPubSubLocations '
+
+if (@Sta_PubPersonsGroup = 8) and (@IsInvAdmin = 0)
+Set @Sql = @Sql + ' where (ReqHd.Dat_BuyReqHdDate between '+''''+@StartDate+''''+' and '+''''+@EndDate+''''+') and (StaBuyReqBranch =1)'
+
+if (@Sta_PubPersonsGroup <> 8) and (@IsInvAdmin = 0)
+	Set @Sql = @Sql + ' where (ReqHd.Dat_BuyReqHdDate between '+''''+@StartDate+''''+' and '+''''+@EndDate+''''+') and (StaBuyReqBranch =0)'
+
+if (@IsInvAdmin = 1)
+	Set @Sql = @Sql + ' where (ReqHd.Dat_BuyReqHdDate between '+''''+@StartDate+''''+' and '+''''+@EndDate+''''+') '
+
+if @SiPubGoods<>''
+	Set @Sql = @Sql + ' and (ReqDt.SiPubGoods in (Select SiSel From dbo.Tss_StdStringSiFindUdf('+''''+@SiPubGoods+''''+')))'
+
+if @SiInvInventory<>''
+	Set @Sql = @Sql + ' and (ReqHd.SiInvInventory in (Select SiSel From dbo.Tss_StdStringSiFindUdf('+''''+@SiInvInventory+''''+')))'
+
+if @SiPubPersonsSpec<>''
+	Set @Sql = @Sql + ' and (ReqHd.SiPubPersonsSpec in (Select SiSel From dbo.Tss_StdStringSiFindUdf('+''''+@SiPubPersonsSpec+''''+')))'
+
+if @FlagGoods=1 and @FlagServices=0
+	Set @Sql = @Sql + ' and (ReqDt.Sta_BuyReqServiceOrGds=0)'
+	
+if @FlagGoods=0 and @FlagServices=1
+	Set @Sql = @Sql + ' and (ReqDt.Sta_BuyReqServiceOrGds=1)'
+
+if @FlagUnit<>15
+	Set @Sql = @Sql + ' and (ReqHd.Sta_Section='+convert(varchar,@FlagUnit)+')'
+	print @Sql
+Exec(@Sql)
+
+
+if @FalgCalcFields=1
+Set @SqlFinal =
+'
+Select ROW_NUMBER() OVER(' + 
+    CASE WHEN @Order <> '' THEN @Order ELSE 'ORDER BY Dat_BuyReqHdDate' END + 
+    ') as RowNumber, * From (
+Select
+	XX.Sta_Priority,
+	XX.SiInvBuyReq_Dt, 
+	XX.SiInvBuyReq_Hd, 
+	XX.SiPubGoods, 
+	XX.SiPubCustomCodes, 
+	XX.Sta_BuyReqServiceOrGds, 
+	XX.Dat_BuyReqNeeddate, 
+	XX.Cod_BuyReqDtCode, 
+	XX.Des_BuyReDtDesc, 
+	XX.Num_BuyReqN, 
+	XX.Num_BuyReqW, 
+	XX.Num_BuyReqM, 
+	XX.Sta_BuyReqDtCancel, 
+	XX.Num_BuyReqOrdered, 
+	XX.Sta_RequestorSection, 
+	XX.Des_ConsumCenter, 
+	XX.Cod_BuyReqHdCode, 
+	XX.Dat_BuyReqHdDate, 
+	XX.Sta_BuyReqHdCancel, 
+	XX.Dat_BuyReqHdCancelDate, 
+	XX.Dat_BuyReqHdConfirmDate, 
+	XX.Des_BuyReqHdDesc, 
+	XX.Dat_BuyReqHdRegDate, 
+	XX.SiInvInventory, 
+	XX.Sta_IsPrinted, 
+	XX.SiPubSubLocations, 
+	XX.Cod_PubGoodsCode, 
+	XX.Des_PubGoodsDesc, 
+	XX.SiPubUnitSpecs1, 
+	XX.Cod_PubUnitCode, 
+	XX.Des_PubUnitDesc, 
+	XX.Cod_InvInventoryCode, 
+	XX.Des_InvInventoryDesc, 
+	XX.Cod_SubLocCode, 
+	XX.Des_SubLocName, 
+	XX.Cod_CustomCodesCode, 
+	XX.Des_CustomCodesDesc,
+	XX.StaBuyReqBranch,
+	XX.Cod_ReqestCode, 
+	XX.Mdt_BuyReqHdRegister, 
+	XX.Mdt_BuyReqHdReqManager, 
+	XX.Mdt_BuyReqHdReqBoss, 
+	XX.Mdt_BuyReqHdReqPurchBoss, 
+	XX.Mdt_BuyReqHdReqPurchCommittee, 
+	XX.Sta_Section,
+	XX.Cod_ExitPass, 
+	XX.Cod_PubPersonCode, 
+	XX.Des_FullName,
+	XX.Num_VaraghLength, 
+	XX.Num_VaraghWidth, 
+	XX.Num_VaraghFee,
+	dbo.Tss_StdStaLabelsUdf(1100,XX.Sta_BuyReqDtCancel) Sta_BuyReqDtCancelDes, 
+	dbo.Tss_StdStaLabelsUdf(1101,XX.Sta_RequestorSection) Sta_RequestorSectionDes, 
+	dbo.Tss_StdStaLabelsUdf(1102,XX.Sta_BuyReqHdCancel) Sta_BuyReqHdCancelDes, 
+	dbo.Tss_StdStaLabelsUdf(1101,XX.Sta_Section) SectionDesc,
+	/*
+	case
+	when (Num_BuyReqN>0) and (xx.Sta_PubUnitType = 0) then
+	Num_BuyReqN - (SELECT ISNULL(SUM(Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount), 0) 
+                  FROM Tss_InvEntrance_Dt INNER JOIN Tss_InvEntrance_Hd ON Tss_InvEntrance_Dt.SiInvEntrance_Hd = Tss_InvEntrance_Hd.SiInvEntrance_Hd
+				  WHERE (Tss_InvEntrance_Dt.SiPubGoods = xx.SiPubGoods) and (Tss_InvEntrance_Dt.SiInvBuyReq_Dt = xx.SiInvBuyReq_Dt)) 
+	when (Num_BuyReqW>0)  and (xx.Sta_PubUnitType = 2) then
+	Num_BuyReqW - (SELECT ISNULL(SUM(Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount), 0)
+                  FROM Tss_InvEntrance_Dt INNER JOIN Tss_InvEntrance_Hd ON Tss_InvEntrance_Dt.SiInvEntrance_Hd = Tss_InvEntrance_Hd.SiInvEntrance_Hd
+   WHERE (Tss_InvEntrance_Dt.SiPubGoods = xx.SiPubGoods) and (Tss_InvEntrance_Dt.SiInvBuyReq_Dt = xx.SiInvBuyReq_Dt)) 
+	when (Num_BuyReqM>0)  and (xx.Sta_PubUnitType = 1) then
+	Num_BuyReqM - (SELECT ISNULL(SUM(Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount), 0)
+ FROM Tss_InvEntrance_Dt INNER JOIN Tss_InvEntrance_Hd ON Tss_InvEntrance_Dt.SiInvEntrance_Hd = Tss_InvEntrance_Hd.SiInvEntrance_Hd
+                  WHERE (Tss_InvEntrance_Dt.SiPubGoods = xx.SiPubGoods) and (Tss_InvEntrance_Dt.SiInvBuyReq_Dt = xx.SiInvBuyReq_Dt)) 
+	else 0
+	End AS BuyMandeh,
+	*/
+
+
+	case
+	when (xx.Num_BuyReqN>0) then
+	    xx.Num_BuyReqN - (SELECT 
+		ISNULL(SUM(Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount), 0) 
+	FROM             
+		Tss_InvEntrance_Dt INNER JOIN
+		Tss_InvEntrance_Hd ON Tss_InvEntrance_Dt.SiInvEntrance_Hd = Tss_InvEntrance_Hd.SiInvEntrance_Hd
+	WHERE    
+		(Tss_InvEntrance_Dt.SiPubGoods = XX.SiPubGoods) and (Tss_InvEntrance_Dt.SiInvBuyReq_Dt = XX.SiInvBuyReq_Dt))
+	when (xx.Num_BuyReqW>0) then
+	xx.Num_BuyReqW - (SELECT 
+		ISNULL(SUM(Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount), 0) 
+	FROM             
+		Tss_InvEntrance_Dt INNER JOIN
+		Tss_InvEntrance_Hd ON Tss_InvEntrance_Dt.SiInvEntrance_Hd = Tss_InvEntrance_Hd.SiInvEntrance_Hd
+	WHERE    
+		(Tss_InvEntrance_Dt.SiPubGoods = XX.SiPubGoods) and (Tss_InvEntrance_Dt.SiInvBuyReq_Dt = XX.SiInvBuyReq_Dt))
+	when (xx.Num_BuyReqM>0) then
+	xx.Num_BuyReqM - 
+	(SELECT 
+		ISNULL(SUM(Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount), 0) 
+	FROM             
+		Tss_InvEntrance_Dt INNER JOIN
+		Tss_InvEntrance_Hd ON Tss_InvEntrance_Dt.SiInvEntrance_Hd = Tss_InvEntrance_Hd.SiInvEntrance_Hd
+	WHERE    
+		(Tss_InvEntrance_Dt.SiPubGoods = XX.SiPubGoods) and (Tss_InvEntrance_Dt.SiInvBuyReq_Dt = XX.SiInvBuyReq_Dt)) 
+	end as BuyMandeh,
+	--$0.0 AS BuyMandeh,
+	$0.0 AS BuyMandehArea,
+
+	(SELECT 
+		ISNULL(SUM(Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount), 0) 
+	FROM             
+		Tss_InvEntrance_Dt INNER JOIN
+		Tss_InvEntrance_Hd ON Tss_InvEntrance_Dt.SiInvEntrance_Hd = Tss_InvEntrance_Hd.SiInvEntrance_Hd
+	WHERE    
+		(Tss_InvEntrance_Dt.SiPubGoods = XX.SiPubGoods) and (Tss_InvEntrance_Dt.SiInvBuyReq_Dt = XX.SiInvBuyReq_Dt)) AS BuyResidShodeh,
+	(SELECT        
+		ISNULL(SUM(Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount), 0)
+    FROM             
+		Tss_InvEntrance_Dt INNER JOIN
+		Tss_InvEntrance_Hd ON Tss_InvEntrance_Dt.SiInvEntrance_Hd = Tss_InvEntrance_Hd.SiInvEntrance_Hd
+	WHERE    
+		(Tss_InvEntrance_Dt.SiPubGoods = xx.SiPubGoods) and (Tss_InvEntrance_Dt.SiInvBuyReq_Dt = xx.SiInvBuyReq_Dt)) 
+	*(isnull(Num_VaraghLength,0)*isnull(Num_VaraghWidth,0)/100000) AS BuyResidShodehArea,
+	'''' Tss_InvBuyReq_HdRegTimeShamsiLong,
+	'''' Tss_InvBuyReq_HdEditTimeShamsiLong,
+	'''' BuyCommisionEditTimeShamsiLong,
+	'''' Mdt_BuyReqHdReqManagerShamsiLong,
+	'''' Mdt_BuyReqHdReqBossShamsiLong,
+	'''' Mdt_BuyReqHdReqPurchBossShamsiLong,
+	'''' Mdt_BuyReqHdReqPurchCommitteeShamsiLong,
+	$0.0 as SiInvEntrance_Hd,
+--	(SELECT top 1 SiInvEntrance_Hd FROM Tss_InvEntrance_Dt WHERE (SiInvBuyReq_Dt = SiInvBuyReq_Dt)) as SiInvEntrance_Hd,
+	$0.0 GdsArea,
+	Dat_BuyReqDtCancelDate,
+	Cod_SaleAgreement2,
+	Dat_SalReqToContractDate, 
+	CodeContGds, 
+	DescContGds, 
+	CodeContGdsMaz, 
+	DescContGdsMaz,
+	CustCode, 
+	CustDesc,	
+	Cod_FlutTypeCode, 
+	Des_FlutTypeName, 
+	Cod_GoodsClassCode,
+	Des_GoodsClassDesc,
+	Num_GdsLength, 
+	Num_GdsWidth,
+	Des_SalerContCode,	
+	SellerCode,
+	SellerDesc
+from
+	##InvBuyReqsRepTemp xx'
+else
+Set @SqlFinal =
+'
+Select ROW_NUMBER() OVER(' + 
+    CASE WHEN @Order <> '' THEN @Order ELSE 'ORDER BY Dat_BuyReqHdDate' END + 
+    ') as RowNumber, * From (
+Select
+	Sta_Priority,
+	SiInvBuyReq_Dt, 
+	SiInvBuyReq_Hd, 
+	SiPubGoods, 
+	SiPubCustomCodes, 
+	Sta_BuyReqServiceOrGds, 
+	Dat_BuyReqNeeddate, 
+	Cod_BuyReqDtCode, 
+	Des_BuyReDtDesc, 
+	Num_BuyReqN, 
+	Num_BuyReqW, 
+	Num_BuyReqM, 
+	Sta_BuyReqDtCancel, 
+	Num_BuyReqOrdered, 
+	Sta_RequestorSection, 
+	Des_ConsumCenter, 
+	Cod_BuyReqHdCode, 
+	Dat_BuyReqHdDate, 
+	Sta_BuyReqHdCancel, 
+	Dat_BuyReqHdCancelDate, 
+	Dat_BuyReqHdConfirmDate, 
+	Des_BuyReqHdDesc, 
+	Dat_BuyReqHdRegDate, 
+	SiInvInventory, 
+	Sta_IsPrinted, 
+	SiPubSubLocations, 
+	Cod_PubGoodsCode, 
+	Des_PubGoodsDesc, 
+	SiPubUnitSpecs1, 
+	Cod_PubUnitCode, 
+	Des_PubUnitDesc, 
+	Cod_InvInventoryCode, 
+	Des_InvInventoryDesc, 
+	Cod_SubLocCode, 
+	Des_SubLocName, 
+	Cod_CustomCodesCode, 
+	Des_CustomCodesDesc,
+	StaBuyReqBranch,
+	Cod_ReqestCode, 
+	Mdt_BuyReqHdRegister, 
+	Mdt_BuyReqHdReqManager, 
+	Mdt_BuyReqHdReqBoss, 
+	Mdt_BuyReqHdReqPurchBoss, 
+	Mdt_BuyReqHdReqPurchCommittee, 
+	Sta_Section,
+	Cod_ExitPass, 
+	Cod_PubPersonCode, 
+	Des_FullName,
+	Num_VaraghLength, 
+	Num_VaraghWidth, 
+	Num_VaraghFee,
+
+	dbo.Tss_StdStaLabelsUdf(1100,Sta_BuyReqDtCancel) Sta_BuyReqDtCancelDes, 
+	dbo.Tss_StdStaLabelsUdf(1101,Sta_RequestorSection) Sta_RequestorSectionDes, 
+	dbo.Tss_StdStaLabelsUdf(1102,Sta_BuyReqHdCancel) Sta_BuyReqHdCancelDes, 
+	dbo.Tss_StdStaLabelsUdf(1101,Sta_Section) SectionDesc,
+	/*
+	case
+	when (Num_BuyReqN>0) and (xx.Sta_PubUnitType = 0) then
+	Num_BuyReqN - (SELECT ISNULL(SUM(Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount), 0) 
+                  FROM Tss_InvEntrance_Dt INNER JOIN Tss_InvEntrance_Hd ON Tss_InvEntrance_Dt.SiInvEntrance_Hd = Tss_InvEntrance_Hd.SiInvEntrance_Hd
+				  WHERE (Tss_InvEntrance_Dt.SiPubGoods = xx.SiPubGoods) and (Tss_InvEntrance_Dt.SiInvBuyReq_Dt = xx.SiInvBuyReq_Dt)) 
+	when (Num_BuyReqW>0)  and (xx.Sta_PubUnitType = 2) then
+	Num_BuyReqW - (SELECT ISNULL(SUM(Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount), 0)
+                  FROM Tss_InvEntrance_Dt INNER JOIN Tss_InvEntrance_Hd ON Tss_InvEntrance_Dt.SiInvEntrance_Hd = Tss_InvEntrance_Hd.SiInvEntrance_Hd
+   WHERE (Tss_InvEntrance_Dt.SiPubGoods = xx.SiPubGoods) and (Tss_InvEntrance_Dt.SiInvBuyReq_Dt = xx.SiInvBuyReq_Dt)) 
+	when (Num_BuyReqM>0)  and (xx.Sta_PubUnitType = 1) then
+	Num_BuyReqM - (SELECT ISNULL(SUM(Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount), 0)
+ FROM Tss_InvEntrance_Dt INNER JOIN Tss_InvEntrance_Hd ON Tss_InvEntrance_Dt.SiInvEntrance_Hd = Tss_InvEntrance_Hd.SiInvEntrance_Hd
+                  WHERE (Tss_InvEntrance_Dt.SiPubGoods = xx.SiPubGoods) and (Tss_InvEntrance_Dt.SiInvBuyReq_Dt = xx.SiInvBuyReq_Dt)) 
+	else 0
+	End AS BuyMandeh,
+	*/
+
+
+	case
+	when (xx.Num_BuyReqN>0) then
+	    xx.Num_BuyReqN - (SELECT 
+		ISNULL(SUM(Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount), 0) 
+	FROM             
+		Tss_InvEntrance_Dt INNER JOIN
+		Tss_InvEntrance_Hd ON Tss_InvEntrance_Dt.SiInvEntrance_Hd = Tss_InvEntrance_Hd.SiInvEntrance_Hd
+	WHERE    
+		(Tss_InvEntrance_Dt.SiPubGoods = XX.SiPubGoods) and (Tss_InvEntrance_Dt.SiInvBuyReq_Dt = XX.SiInvBuyReq_Dt))
+	when (xx.Num_BuyReqW>0) then
+	xx.Num_BuyReqW - (SELECT 
+		ISNULL(SUM(Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount), 0) 
+	FROM             
+		Tss_InvEntrance_Dt INNER JOIN
+		Tss_InvEntrance_Hd ON Tss_InvEntrance_Dt.SiInvEntrance_Hd = Tss_InvEntrance_Hd.SiInvEntrance_Hd
+	WHERE    
+		(Tss_InvEntrance_Dt.SiPubGoods = XX.SiPubGoods) and (Tss_InvEntrance_Dt.SiInvBuyReq_Dt = XX.SiInvBuyReq_Dt))
+	when (xx.Num_BuyReqM>0) then
+	xx.Num_BuyReqM - 
+	(SELECT 
+		ISNULL(SUM(Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount), 0) 
+	FROM             
+		Tss_InvEntrance_Dt INNER JOIN
+		Tss_InvEntrance_Hd ON Tss_InvEntrance_Dt.SiInvEntrance_Hd = Tss_InvEntrance_Hd.SiInvEntrance_Hd
+	WHERE    
+		(Tss_InvEntrance_Dt.SiPubGoods = XX.SiPubGoods) and (Tss_InvEntrance_Dt.SiInvBuyReq_Dt = XX.SiInvBuyReq_Dt)) 
+	end as BuyMandeh,
+
+	(SELECT 
+		ISNULL(SUM(Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount), 0) 
+	FROM             
+		Tss_InvEntrance_Dt INNER JOIN
+		Tss_InvEntrance_Hd ON Tss_InvEntrance_Dt.SiInvEntrance_Hd = Tss_InvEntrance_Hd.SiInvEntrance_Hd
+	WHERE    
+		(Tss_InvEntrance_Dt.SiPubGoods = XX.SiPubGoods) and (Tss_InvEntrance_Dt.SiInvBuyReq_Dt = XX.SiInvBuyReq_Dt)) AS BuyResidShodeh,	
+	(SELECT        
+		ISNULL(SUM(Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount), 0)
+    FROM             
+		Tss_InvEntrance_Dt INNER JOIN
+		Tss_InvEntrance_Hd ON Tss_InvEntrance_Dt.SiInvEntrance_Hd = Tss_InvEntrance_Hd.SiInvEntrance_Hd
+	WHERE    
+		(Tss_InvEntrance_Dt.SiPubGoods = xx.SiPubGoods) and (Tss_InvEntrance_Dt.SiInvBuyReq_Dt = xx.SiInvBuyReq_Dt)) 
+	*(isnull(Num_VaraghLength,0)*isnull(Num_VaraghWidth,0)/100000) AS BuyResidShodehArea,
+	$0.0 AS BuyMandehArea,
+	'''' Tss_InvBuyReq_HdRegTimeShamsiLong,
+	'''' Tss_InvBuyReq_HdEditTimeShamsiLong,
+	'''' BuyCommisionEditTimeShamsiLong,
+	'''' Mdt_BuyReqHdReqManagerShamsiLong,
+	'''' Mdt_BuyReqHdReqBossShamsiLong,
+	'''' Mdt_BuyReqHdReqPurchBossShamsiLong,
+	'''' Mdt_BuyReqHdReqPurchCommitteeShamsiLong,
+	$0.0 as SiInvEntrance_Hd,
+	$0.0 GdsArea,
+	Dat_BuyReqDtCancelDate,
+	Cod_SaleAgreement2,
+	Dat_SalReqToContractDate, 
+	CodeContGds, 
+	DescContGds, 
+	CodeContGdsMaz, 
+	DescContGdsMaz,
+	CustCode, 
+	CustDesc,	
+	Cod_FlutTypeCode, 
+	Des_FlutTypeName, 
+	Cod_GoodsClassCode,
+	Des_GoodsClassDesc,
+	Num_GdsLength, 
+	Num_GdsWidth,
+	Des_SalerContCode,	
+	SellerCode,
+	SellerDesc
+
+from
+	##InvBuyReqsRepTemp xx'
+
+
+
+Set @SqlFinal = @SqlFinal +@InternalWhere+' ) CalcSel ' + @Where + @Order
+
+
+exec(@SqlFinal)
+
+GO
