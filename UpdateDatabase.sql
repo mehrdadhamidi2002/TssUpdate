@@ -8090,10 +8090,10 @@ alter proc Tss_InvAsnadVaredehRep
 (
 	@SiVouchers varchar(8000)='',
 	@SiSanad varchar(8000)='',
-	@SiAnbar varchar(8000)='13',
-	@StDate varchar(10)='1404/11/11',
-	@EnDate varchar(10)='1404/11/12',
-	@SiGds varchar(8000)='1',
+	@SiAnbar varchar(8000)='',
+	@StDate varchar(10)='',
+	@EnDate varchar(10)='',
+	@SiGds varchar(8000)='',
 	@SiPer varchar(8000)='',
 	@SortFlag SmallInt=0,
 	@InternalWhere VarChar(8000)='',
@@ -8349,12 +8349,12 @@ if @SiCust<>''
 Set @SqlTxt2 = @SqlTxt2 +' and (Tss_SalInvoice_Hd.SiPubPersonsSpec in (select sisel from dbo.Tss_StdStringSiFindUdf('+''''+@SiCust+''''+')))'
 
 if @SiVouchers<>''
-Set @SqlTxt2 = @SqlTxt2 +' and (Tss_InvEntrance_Dt.SiVchDt in (select sisel from dbo.Tss_StdStringSiFindUdf('+''''+@SiVouchers+''''+')))'
+Set @SqlTxt2 = @SqlTxt2 +' and (Tss_InvEntrance_Hd.SiInvEntrance_Hd in (select sisel from dbo.Tss_StdStringSiFindUdf('+''''+@SiVouchers+''''+')))'
 
 
 
---print @SqlTxt1
---print @SqlTxt2
+print @SqlTxt1
+print @SqlTxt2
 
 Exec(
 	'Select distinct * into ##AsnadVaredehRepTemp From  (Select * from
@@ -8537,8 +8537,9 @@ IF @Order <> ''
 ELSE
     SET @FinalSql = @FinalSql + ' Order by Dat_InvEnterDate'
 	--print @FinalSql
--- Execute the final SQL
+-- Execute the final SQl
 Exec(@FinalSql)
+
 
 GO
 
@@ -8638,7 +8639,7 @@ if @SiCust<>''
 Set @SqlTxt = @SqlTxt +' and (Tss_SalInvoice_Hd.SiPubPersonsSpec in (select sisel from dbo.Tss_StdStringSiFindUdf('+''''+@SiCust+''''+')))'
 
 if @SiVouchers<>''
-Set @SqlTxt = @SqlTxt +' and (Tss_InvEntrance_Dt.SiVchDt in (select sisel from dbo.Tss_StdStringSiFindUdf('+''''+@SiVouchers+''''+')))'
+Set @SqlTxt = @SqlTxt +' and (Tss_InvEntrance_Hd.SiInvEntrance_Hd in (select sisel from dbo.Tss_StdStringSiFindUdf('+''''+@SiVouchers+''''+')))'
 
 print
 	'Select * From  (Select * from
@@ -8648,9 +8649,10 @@ Exec(
 	'Select * From  (Select * from
 		('+@SqlTxt+') Calc '+@InternalWhere +') CalcSel '+ @Where + @Order)
 
+
 GO
 
-CREATE proc Tss_InvBuyReqsRepStp
+alter proc Tss_InvBuyReqsRepStp
 (
 	@InternalWhere VarChar(8000)='',
 	@Where VarChar(8000)='',
