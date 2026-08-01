@@ -8612,7 +8612,7 @@ FROM            Tss_PubPersonsViw INNER JOIN
                          Tss_PubUnitSpecs AS Tss_PubUnitSpecs_2 RIGHT OUTER JOIN
                          Tss_PubGoods ON Tss_PubUnitSpecs_2.SiPubUnitSpecs = Tss_PubGoods.SiPubUnitSpecs1 ON Tss_PubUnitSpecs_1.SiPubUnitSpecs = Tss_PubGoods.SiPubUnitSpecs2 ON 
                          Tss_InvEntrance_Dt.SiPubGoods = Tss_PubGoods.SiPubGoods
-GROUP BY Tss_InvEntrance_Hd.Sta_InvEntBranch, Tss_InvEntrance_Hd.SiPubCustomCodes, Tss_InvInventory.SiInvInventory, Tss_PubGoods.Cod_PubGoodsCode, Tss_PubGoods.SiPubGoods, Tss_PubGoods.Des_PubGoodsDesc, 
+GROUP BY Tss_InvEntrance_Hd.SiInvEntrance_Hd, Tss_InvEntrance_Hd.Sta_InvEntBranch, Tss_InvEntrance_Hd.SiPubCustomCodes, Tss_InvInventory.SiInvInventory, Tss_PubGoods.Cod_PubGoodsCode, Tss_PubGoods.SiPubGoods, Tss_PubGoods.Des_PubGoodsDesc, 
                          SPACE(1) + ISNULL(dbo.PubFindGdsTechSpec(Tss_PubGoods.SiPubGoods, 1298), ''), ISNULL(dbo.PubFindGdsTechSpec(Tss_PubGoods.SiPubGoods, 1299), ''), Tss_InvInventory.Cod_InvInventoryCode, 
                          Tss_InvInventory.Des_InvInventoryDesc, Tss_PubCustomCodes.Cod_CustomCodesCode, Tss_PubCustomCodes.Des_CustomCodesDesc, dbo.Tss_StdStaLabelsUdf(1092, Tss_InvEntrance_Dt.Sta_InvEntUsedUnit), 
                          Tss_InvEntrance_Hd.Dat_InvEnterDate, Tss_InvEntrance_Hd.Cod_InvProvisionalRecieptNo, Tss_PubUnitSpecs_1.Des_PubUnitDesc, Tss_PubUnitSpecs_2.Des_PubUnitDesc, Tss_InvEntrance_Hd.SiPubPersonsSpec, 
