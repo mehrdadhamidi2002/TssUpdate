@@ -8598,7 +8598,9 @@ SELECT        Tss_InvEntrance_Hd.SiPubCustomCodes, Tss_InvInventory.SiInvInvento
                          Tss_InvEntrance_Hd.Cod_InvEntHeaderCode, Tss_InvEntrance_Hd.Dat_InvEnterDate, Tss_InvEntrance_Hd.Cod_InvProvisionalRecieptNo, Tss_PubUnitSpecs_1.Des_PubUnitDesc, Tss_InvEntrance_Hd.SiPubPersonsSpec, 
                          Tss_PubPersonsViw.Des_FullName, Tss_PubUnitSpecs_2.Des_PubUnitDesc AS VahedeSanjesh2, Tss_InvEntrance_Dt.Num_InvEntDtGdsAmt2Coef, SalerPerson.Cod_PubPersonCode, 
                          SalerPerson.Des_FullName AS Des_FullNameSaler, Tss_SalInvoice_Hd.SiPubPersonsSpec AS SiCust, Tss_InvEntrance_Dt.SiVchDt, Deliverer.Des_FullName AS DelivererDes, Tss_InvEntrance_Dt.Num_VaredehRialiAmt, 
-                         Tss_InvEntrance_Dt.Num_TaxFee, Tss_InvEntrance_Dt.Num_TaxFee * Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount AS RowAllTax, Tss_InvEntrance_Dt.Num_InvEntDetailRialFee
+                         Tss_InvEntrance_Dt.Num_TaxFee, Tss_InvEntrance_Dt.Num_TaxFee * Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount AS RowAllTax, Tss_InvEntrance_Dt.Num_InvEntDetailRialFee,
+						 Tss_InvEntrance_Dt.Num_InvEntDetailRialFee*Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount as RowTotRialiWithoutTax,
+                         Tss_InvEntrance_Dt.Num_TransportCostFee*Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount as RowTotHaml
 FROM            Tss_PubPersonsViw INNER JOIN
                          Tss_SalInvoice_Hd ON Tss_PubPersonsViw.SiPubPersonsSpec = Tss_SalInvoice_Hd.SiPubPersonsSpec RIGHT OUTER JOIN
                          Tss_PubPersonsViw AS SalerPerson RIGHT OUTER JOIN
@@ -8612,7 +8614,9 @@ FROM            Tss_PubPersonsViw INNER JOIN
                          Tss_PubUnitSpecs AS Tss_PubUnitSpecs_2 RIGHT OUTER JOIN
                          Tss_PubGoods ON Tss_PubUnitSpecs_2.SiPubUnitSpecs = Tss_PubGoods.SiPubUnitSpecs1 ON Tss_PubUnitSpecs_1.SiPubUnitSpecs = Tss_PubGoods.SiPubUnitSpecs2 ON 
                          Tss_InvEntrance_Dt.SiPubGoods = Tss_PubGoods.SiPubGoods
-GROUP BY Tss_InvEntrance_Hd.SiInvEntrance_Hd, Tss_InvEntrance_Hd.Sta_InvEntBranch, Tss_InvEntrance_Hd.SiPubCustomCodes, Tss_InvInventory.SiInvInventory, Tss_PubGoods.Cod_PubGoodsCode, Tss_PubGoods.SiPubGoods, Tss_PubGoods.Des_PubGoodsDesc, 
+GROUP BY 
+	Tss_InvEntrance_Hd.SiInvEntrance_Hd, Tss_InvEntrance_Hd.Sta_InvEntBranch, Tss_InvEntrance_Hd.SiPubCustomCodes, Tss_InvInventory.SiInvInventory, 
+	Tss_PubGoods.Cod_PubGoodsCode, Tss_PubGoods.SiPubGoods, Tss_PubGoods.Des_PubGoodsDesc, Tss_InvEntrance_Dt.Num_TransportCostFee,
                          SPACE(1) + ISNULL(dbo.PubFindGdsTechSpec(Tss_PubGoods.SiPubGoods, 1298), ''), ISNULL(dbo.PubFindGdsTechSpec(Tss_PubGoods.SiPubGoods, 1299), ''), Tss_InvInventory.Cod_InvInventoryCode, 
                          Tss_InvInventory.Des_InvInventoryDesc, Tss_PubCustomCodes.Cod_CustomCodesCode, Tss_PubCustomCodes.Des_CustomCodesDesc, dbo.Tss_StdStaLabelsUdf(1092, Tss_InvEntrance_Dt.Sta_InvEntUsedUnit), 
                          Tss_InvEntrance_Hd.Dat_InvEnterDate, Tss_InvEntrance_Hd.Cod_InvProvisionalRecieptNo, Tss_PubUnitSpecs_1.Des_PubUnitDesc, Tss_PubUnitSpecs_2.Des_PubUnitDesc, Tss_InvEntrance_Hd.SiPubPersonsSpec, 
@@ -8651,6 +8655,7 @@ Exec(
 
 
 GO
+
 
 alter proc Tss_InvBuyReqsRepStp
 (
@@ -9177,3 +9182,77 @@ Set @SqlFinal = @SqlFinal +@InternalWhere+' ) CalcSel ' + @Where + @Order
 exec(@SqlFinal)
 
 GO
+
+alter VIEW dbo.Tss_InvEntranceDtVw
+AS
+SELECT        dbo.Tss_InvEntrance_Hd.Cod_InvEntHeaderCode, dbo.Tss_InvEntrance_Hd.Dat_InvEnterDate, dbo.Tss_InvEntrance_Dt.SiPubGoods, dbo.Tss_InvEntrance_Hd.SiInvInventory, dbo.Tss_InvEntrance_Hd.SiPubCustomCodes, 
+                         dbo.Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount, dbo.Tss_InvEntrance_Dt.Num_InvEntDetailRialFee, dbo.Tss_InvEntrance_Dt.Cod_invEntDetailCode, dbo.Tss_InvEntrance_Dt.SiInvEntrance_Dt, 
+                         dbo.Tss_InvEntrance_Dt.SiInvEntrance_Hd, dbo.Tss_InvInventory.Cod_InvInventoryCode, dbo.Tss_InvInventory.Des_InvInventoryDesc, dbo.Tss_PubGoods.Cod_PubGoodsCode, dbo.Tss_PubGoods.Des_PubGoodsDesc, 
+                         dbo.Tss_PubCustomCodes.Cod_CustomCodesCode, dbo.Tss_PubCustomCodes.Des_CustomCodesDesc, dbo.Tss_InvEntrance_Hd.Des_BarnamehNo, dbo.Tss_InvEntrance_Hd.SiPubPersonsSpec AS SiSaler, 
+                         dbo.Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount AS TotAmt, dbo.Tss_PubPersonsViw.Cod_PubPersonCode, dbo.Tss_PubPersonsViw.Des_FullName
+FROM            dbo.Tss_InvEntrance_Dt INNER JOIN
+                         dbo.Tss_InvEntrance_Hd ON dbo.Tss_InvEntrance_Dt.SiInvEntrance_Hd = dbo.Tss_InvEntrance_Hd.SiInvEntrance_Hd INNER JOIN
+                         dbo.Tss_InvInventory ON dbo.Tss_InvEntrance_Hd.SiInvInventory = dbo.Tss_InvInventory.SiInvInventory INNER JOIN
+                         dbo.Tss_PubGoods ON dbo.Tss_InvEntrance_Dt.SiPubGoods = dbo.Tss_PubGoods.SiPubGoods INNER JOIN
+                         dbo.Tss_PubCustomCodes ON dbo.Tss_InvEntrance_Hd.SiPubCustomCodes = dbo.Tss_PubCustomCodes.SiPubCustomCodes LEFT OUTER JOIN
+                         dbo.Tss_PubPersonsViw ON dbo.Tss_InvEntrance_Dt.SiPubPersonsSpec = dbo.Tss_PubPersonsViw.SiPubPersonsSpec
+
+GO
+
+alter PROCEDURE Tss_InvUntEntrancesVStp
+(  
+	@InternalWhere VarChar(8000)='',  
+	@Where VarChar(8000)='',  
+	@Order VarChar(8000)='',
+	@StDate varchar(10)='',
+	@EnDate varchar(10)='',
+	@SiUser numeric=1
+) AS   
+
+If isnull(@InternalWhere,'')<>''   
+   Set @InternalWhere=' Where '+@InternalWhere  
+else
+	Set @InternalWhere=''
+
+If @Where<>''   
+   Set @Where=' Where '+@Where  
+else
+	Set @Where=''
+
+If isnull(@Order,'')<>''   
+   Set @Order=' order by '+@Order  
+else
+	Set @Order=' order by Dat_InvEnterDate '
+
+
+Declare @Sql nvarchar(max)
+
+
+Set @Sql =
+'
+Select  * From
+(
+   Select * From
+   (   
+   SELECT        Tss_InvEntrance_Dt.SiInvEntrance_Dt, Tss_InvEntrance_Dt.SiPubGoods, Tss_InvEntrance_Dt.SiInvEntrance_Hd, Tss_InvEntrance_Dt.Cod_invEntDetailCode, Tss_InvEntrance_Dt.Sta_InvEntUsedUnit, 
+                         Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount, Tss_InvEntrance_Dt.Des_InvEntDetailDesc, Tss_InvEntrance_Dt.Num_InvEntDetailRialFee, Tss_InvEntrance_Dt.Mdt_InvEntDetailRegTime, 
+                         Tss_InvEntrance_Dt.StmInvEntrance_Dt, Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount2, Tss_InvEntrance_Dt.Num_InvEntDetailGdsAmount3, Tss_InvEntrance_Dt.SiPubPersonsSpec, 
+                         Tss_InvEntrance_Dt.Num_InvEntDtGdsAmt2Coef, Tss_InvEntrance_Dt.Num_TransportCostFee, Tss_InvEntrance_Dt.SiVchDt, Tss_InvEntrance_Dt.Num_TaxFee, Tss_InvEntrance_Dt.Num_Serial, 
+                         Tss_InvEntrance_Dt.Tss_InvEntrance_DtRegTime, Tss_InvEntrance_Dt.Tss_InvEntrance_DtRegisterer, Tss_InvEntrance_Dt.Tss_InvEntrance_DtEditTime, Tss_InvEntrance_Dt.Tss_InvEntrance_DtEditor, 
+                         Tss_InvEntrance_Dt.SiSalInvoice_Hd, Tss_InvEntrance_Dt.SiInvBuyReq_Dt, Tss_InvEntrance_Dt.RealDimCol1, Tss_InvEntrance_Dt.RealDimCol2, Tss_InvEntrance_Dt.RealDimCol3, Tss_InvEntrance_Dt.RealDimCol4, 
+                         Tss_InvEntrance_Dt.RealDimCol5, Tss_InvEntrance_Dt.RealDimCol6, Tss_InvEntrance_Dt.OptDimCol1, Tss_InvEntrance_Dt.OptDimCol2, Tss_InvEntrance_Dt.OptDimCol3, Tss_InvEntrance_Dt.OptDimCol4, 
+                         Tss_InvEntrance_Dt.OptDimCol5, Tss_InvEntrance_Dt.OptDimCol6, Tss_InvEntrance_Dt.Des_StoreName, Tss_InvEntrance_Dt.Num_VaredehRialiAmt, Tss_InvInventory.Cod_InvInventoryCode, 
+                         Tss_InvInventory.Des_InvInventoryDesc, Tss_PubCustomCodes.Cod_CustomCodesCode, Tss_PubCustomCodes.Des_CustomCodesDesc, Saler.Cod_PubPersonCode, Saler.Des_FullName, 
+                         Deliverer.Cod_PubPersonCode AS Expr1, Deliverer.Des_FullName AS Expr2, Tss_PubGoods.Cod_PubGoodsCode, Tss_PubGoods.Des_PubGoodsDesc, Tss_InvEntrance_Hd.SiPubCustomCodes, 
+                         Tss_InvEntrance_Hd.SiInvInventory, Tss_InvEntrance_Hd.SiPubPersonsSpec AS Expr3, Tss_InvEntrance_Hd.Dat_InvEnterDate, Tss_InvEntrance_Hd.Cod_InvEntHeaderCode
+FROM            Tss_InvEntrance_Dt INNER JOIN
+                         Tss_InvEntrance_Hd ON Tss_InvEntrance_Dt.SiInvEntrance_Hd = Tss_InvEntrance_Hd.SiInvEntrance_Hd INNER JOIN
+                         Tss_InvInventory ON Tss_InvEntrance_Hd.SiInvInventory = Tss_InvInventory.SiInvInventory INNER JOIN
+                         Tss_PubCustomCodes ON Tss_InvEntrance_Hd.SiPubCustomCodes = Tss_PubCustomCodes.SiPubCustomCodes INNER JOIN
+                         Tss_PubGoods ON Tss_InvEntrance_Dt.SiPubGoods = Tss_PubGoods.SiPubGoods LEFT OUTER JOIN
+                         Tss_PubPersonsViw AS Deliverer ON Tss_InvEntrance_Dt.SiPubPersonsSpec = Deliverer.SiPubPersonsSpec LEFT OUTER JOIN
+                         Tss_PubPersonsViw AS Saler ON Tss_InvEntrance_Hd.SiPubPersonsSpec = Saler.SiPubPersonsSpec
+                           ) Ccc  '+@InternalWhere+'
+) CalcSel ' + @Where + @Order
+print @sql
+exec (@Sql)
