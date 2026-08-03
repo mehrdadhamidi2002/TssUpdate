@@ -9255,3 +9255,294 @@ FROM            Tss_InvEntrance_Dt INNER JOIN
                            ) Ccc  '+@InternalWhere+'
 ) CalcSel ' + @Where + @Order
 exec (@Sql)
+
+GO
+
+alter   PROCEDURE Tss_SalCopyContractStp
+(
+    @SiContractRepeat NUMERIC = 29490,
+    @StaMainOrNot SMALLINT = 1,
+    @SiUser NUMERIC = 1,
+    @CodContractNew VARCHAR(50) OUTPUT
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE 
+        @CodContractRepeat VARCHAR(50),
+        @SiNew NUMERIC,
+        @DateNow VARCHAR(10),
+        @SubLoc VARCHAR(50),
+        @SiPubSubLocations NUMERIC;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        -- Get sub location of the original contract
+        SELECT @SiPubSubLocations = SiPubSubLocations
+        FROM Tss_SalInvoice_Hd
+        WHERE SiSalInvoice_Hd = @SiContractRepeat;
+
+        -- Current Shamsi date
+        SET @DateNow = dbo.Tss_StdMildi2ShamsiUdf(GETDATE());
+
+        -- Generate next Cod_SaleAgreement2
+        SELECT @CodContractRepeat = 
+            CAST(ISNULL(MAX(CONVERT(NUMERIC, Cod_SaleAgreement2)), 0) + 1 AS VARCHAR(50))
+        FROM Tss_SalInvoice_Hd
+        WHERE SiPubSubLocations = @SiPubSubLocations
+          AND ISNULL(Cod_SaleAgreement2,'') <> '';
+
+        SET @SubLoc = dbo.Tss_StdFindSubLoc(0);
+
+        -- Return new contract code
+        SET @CodContractNew = @CodContractRepeat;
+
+        ---------------------------
+        -- Insert new contract (HD)
+        ---------------------------
+        INSERT INTO Tss_SalInvoice_Hd
+        (
+            SiSalTypeOfSales, SiPubCustomCodes, SiPubPersonsSpec, Cod_SaleAgreement,
+            Sta_MainOrNot, Cod_SaleAgreement2, Des_SaleAgreementDesc, Dat_SalReqToContractDate,
+            Num_SaleAgreementPriority, Cod_LetterNo, Num_PreRecieveAmount, Num_DiscountAmount,
+            Sta_TransportState, Dat_SaleRequestRegDate, Des_HeaderDesc, Des_EndDocDesc,
+            Sta_Kosoorat, Num_ProductionTelorance, Sta_ContractStatus,
+            Sta_ContractFormStatus, Sta_ForProdOrSale, StmSalInvoice_Hd,
+            Cod_SaleAgreementChange, Des_SalInvoiceChangeDesc, Des_SalInvoiceChangeDescOld,
+            Dat_SalConfirmOfProdDate, SiSalInvoiceRepeat_Hd, SiPubPersonsSpecEditor,
+            Mdt_SalConfirmOfProdDateMali, Mdt_SalConfirmOfProdDateBoss,
+            Mdt_SalConfirmOfProdDateFac, Mdt_SalConfirmOfProdDatePrc,
+            SiPubSubLocations, Dat_ApprovedForProd, Tss_SalInvoice_HdRegTime,
+            Tss_SalInvoice_HdEditTime, Tss_SalInvoice_HdRegisterer, Tss_SalInvoice_HdEditor,
+            Sta_Branch, Sta_DiscountState, Sta_CurrencyType, Num_CurrencyRate,
+            Sta_ErsalStatus, Num_CreditDays, Sta_ContIsLaminate
+        )
+        SELECT
+            SiSalTypeOfSales, SiPubCustomCodes, SiPubPersonsSpec, Cod_SaleAgreement,
+            @StaMainOrNot, @CodContractRepeat, Des_SaleAgreementDesc, @DateNow,
+            Num_SaleAgreementPriority, Cod_LetterNo, Num_PreRecieveAmount, 0,
+            Sta_TransportState, @DateNow, Des_HeaderDesc, Des_EndDocDesc,
+            Sta_Kosoorat, Num_ProductionTelorance, 0,
+            Sta_ContractFormStatus, Sta_ForProdOrSale, NULL,
+            Cod_SaleAgreementChange, Des_SalInvoiceChangeDesc, Des_SalInvoiceChangeDescOld,
+            Dat_SalConfirmOfProdDate, NULL, @SiUser,
+            Mdt_SalConfirmOfProdDateMali, Mdt_SalConfirmOfProdDateBoss,
+            Mdt_SalConfirmOfProdDateFac, Mdt_SalConfirmOfProdDatePrc,
+            SiPubSubLocations, '',
+            Tss_SalInvoice_HdRegTime, Tss_SalInvoice_HdEditTime,
+            Tss_SalInvoice_HdRegisterer, Tss_SalInvoice_HdEditor,
+            Sta_Branch, 0, Sta_CurrencyType, Num_CurrencyRate,
+            Sta_ErsalStatus, Num_CreditDays, Sta_ContIsLaminate
+        FROM Tss_SalInvoice_Hd
+        WHERE SiSalInvoice_Hd = @SiContractRepeat;
+
+        SET @SiNew = SCOPE_IDENTITY();
+
+        ---------------------------
+        -- Insert new contract (DT)
+        ---------------------------
+         ---------------------------
+        -- Insert new contract (DT) and capture mapping
+        ---------------------------
+        IF ISNULL(@SiNew,0) <> 0
+        BEGIN
+            -- Temp table to hold mapping between old and new DT rows
+            declare 
+	            @counter int,
+	            @DeliDateAfter int,
+                @DatDelivery varchar(10)
+
+            SELECT        
+                @DeliDateAfter = isnull(Des_SysParamsValue,0)
+            FROM            
+                Tss_StdAllSystemParams
+            WHERE        
+                (Des_SysParamsName = 'SaleDeliDateAfter')
+
+            Set @counter = 1
+			Set @DatDelivery = @DateNow
+
+			WHILE @counter<@DeliDateAfter+1
+			Begin
+				Set @DatDelivery = dbo.Tss_StdOneDayIncUdf(@DatDelivery)
+				Set @counter = @counter + 1
+			End
+
+            DECLARE @Map TABLE
+            (
+                OldSiSalInvoice_Dt NUMERIC,
+                NewSiSalInvoice_Dt NUMERIC
+            );
+
+            INSERT INTO dbo.Tss_SalInvoice_Dt
+            (
+                SiSalInvoice_Hd, SiPrcGoodsType, SiPrcFlutType,
+                SiPubCustomCodesColor1, SiPubCustomCodesColor2, SiPrcDieSpec,
+                SiPubCustomCodesColo4, SiPubCustomCodesColor3, SiPubCustomCodesColor5,
+                SiPubCustomCodesColor6, Cod_SampleGdsCode, SiPrcKelisheSpec, SiPubGoods,
+                SiPubGoodsClassify, Num_SalInvoiceDetRow, Num_GdsAmountNo, Num_ColoringRate,
+                Num_GdsArea, Num_GdsFee, Num_SampleInnerLength, Num_SampleInnerWidth,
+                Num_SampleInnerHeigth, Num_SampleOuterLength, Num_SampleOuterWidth,
+                Num_SampleOuterHeigth, Num_SampleHoleNo, Num_SampleMasrafCoefOfBox,
+                Sta_HasMangene, Sta_IsLipStick, Num_NoOfPrintingSides, Num_GdsColorFee,
+                Num_GdsDieFee, Num_FeeAdjust, Num_GoodsLength, Num_GoodsWidth,
+                StmSalInvoice_Dt, Sta_Cyan, Sta_Magenta, Sta_Yellow, Sta_Black,
+                Sta_HasVerni, Num_VaraghCreaseAmt, Num_VaraghUpDoorAmt, Num_VaraghDownDoorAmt,
+                Sta_HoleSide, Sta_CatchSide, Sta_PrintArm, Sta_PackType,
+                Num_OneMeterSheetPrice, Num_OneMeterBoxPrice, SiPubCustomCodes,
+                Sta_EttesalType, Sta_HasGooshvareh, Num_UpDoorOpenSize, Num_DownDoorOpenSize,
+                Sta_ShowJens, Sta_HighSensibility, Sta_OuterPrint, Sta_ShowJensBrief,
+                Num_GdsInWidthBuyReq, Num_GdsInLengthBuyReq, Sta_IsDoubleCrease,
+                Num_ContLabChasbConst, Num_NoInPallete, Num_FeeHaml,
+                SiSalInvoiceDtCopiedFrom, Sta_IsFeeAdjustPercent, Num_GdsFeeRounder,
+                Num_GdsPalleteFee, Sta_HasDesign, Sta_CellophaneType, Sta_MatteOrGlossy,
+                Num_GdsLaminateFee, SiPubGoodsClassifyCardBox, Sta_OffsetAreaType,
+                Num_OffsetHeightPrint, Num_PunchNo, Num_CustomerTarkibiWidth,
+                SiSalInvoice_DtCombinee, LamDieLen, LamDieWid, LamDieNo,
+                LamCardBoardLen, LamCardBoardWid, LamCardBoardArea, LamCardBoardFee,
+                LamCalcPert, LamCorrugRoleWid, LamCorrugPert, LamLaminateFee,
+                LamDieFee, LamSiHamlGeoPlace, LamPrintTypeS, LamPrintTypeG,
+                LamPrintTypeP1, LamPrintTypeP2, LamPrintTypeP3, LamPrintTypeP4,
+                LamJointNo, LamJointAuto, LamJointSemiAuto, LamJointHand, LamJointTwoPiece,
+                LamJointLockBottom, LamJointFourPoint, LamJointPunch, LamPackNo,
+                LamPackStrap, LamPackStrapBaGuard, LamPackShrink, LamPackMotherBox,
+                LamPackNylon, LamPackPallete, LamBelongZinkPrice, LamBelongDiePrice,
+                LamBelongKelishePrice, LamBelongHandlePrice, LamBelongTalcPrice,
+                LamBelongCardBoardUnitFee, LamBelongSheetUnitFee, LamBelongPrintUnitFee,
+                LamBelongColorUnitFee, LamBelongCoverUnitFee, LamBelongLaminateUnitFee,
+                LamBelongJointUnitFee, LamBelongPackUnitFee, LamBelongTransportUnitFee,
+                LamOtherCosts, LamCalcBelongCosts, LamBelongCosts, LamPrintType,
+                LamCoverLen, LamCoverWid, LamCoverGlassy, LamCoverMatt, LamCoverMetallize,
+                LamCoverVerni, LamCoverUV, LamDesc, Des_RowDesc, Num_ActualFeeAdjust
+            )
+            OUTPUT inserted.SiSalInvoiceDtCopiedFrom, inserted.SiSalInvoice_Dt
+            INTO @Map(OldSiSalInvoice_Dt, NewSiSalInvoice_Dt)
+            SELECT
+                @SiNew, SiPrcGoodsType, SiPrcFlutType, SiPubCustomCodesColor1,
+                SiPubCustomCodesColor2, SiPrcDieSpec, SiPubCustomCodesColo4,
+                SiPubCustomCodesColor3, SiPubCustomCodesColor5, SiPubCustomCodesColor6,
+                Cod_SampleGdsCode, SiPrcKelisheSpec, SiPubGoods, SiPubGoodsClassify,
+                Num_SalInvoiceDetRow, Num_GdsAmountNo, Num_ColoringRate, Num_GdsArea,
+                Num_GdsFee, Num_SampleInnerLength, Num_SampleInnerWidth,
+                Num_SampleInnerHeigth, Num_SampleOuterLength, Num_SampleOuterWidth,
+                Num_SampleOuterHeigth, Num_SampleHoleNo, Num_SampleMasrafCoefOfBox,
+                Sta_HasMangene, Sta_IsLipStick, Num_NoOfPrintingSides, Num_GdsColorFee,
+                Num_GdsDieFee, Num_FeeAdjust, Num_GoodsLength, Num_GoodsWidth,
+                NULL, Sta_Cyan, Sta_Magenta, Sta_Yellow, Sta_Black,
+                Sta_HasVerni, Num_VaraghCreaseAmt, Num_VaraghUpDoorAmt, Num_VaraghDownDoorAmt,
+                Sta_HoleSide, Sta_CatchSide, Sta_PrintArm, Sta_PackType,
+                0, 0, SiPubCustomCodes, Sta_EttesalType, Sta_HasGooshvareh,
+                Num_UpDoorOpenSize, Num_DownDoorOpenSize, Sta_ShowJens, Sta_HighSensibility,
+                Sta_OuterPrint, Sta_ShowJensBrief, Num_GdsInWidthBuyReq, Num_GdsInLengthBuyReq,
+                Sta_IsDoubleCrease, Num_ContLabChasbConst, Num_NoInPallete, Num_FeeHaml,
+                SiSalInvoice_Dt, Sta_IsFeeAdjustPercent, Num_GdsFeeRounder, Num_GdsPalleteFee,
+                Sta_HasDesign, Sta_CellophaneType, Sta_MatteOrGlossy, Num_GdsLaminateFee,
+                SiPubGoodsClassifyCardBox, Sta_OffsetAreaType, Num_OffsetHeightPrint, Num_PunchNo,
+                Num_CustomerTarkibiWidth, SiSalInvoice_DtCombinee, LamDieLen, LamDieWid, LamDieNo,
+                LamCardBoardLen, LamCardBoardWid, LamCardBoardArea, LamCardBoardFee,
+                LamCalcPert, LamCorrugRoleWid, LamCorrugPert, LamLaminateFee, LamDieFee,
+                LamSiHamlGeoPlace, LamPrintTypeS, LamPrintTypeG, LamPrintTypeP1, LamPrintTypeP2,
+                LamPrintTypeP3, LamPrintTypeP4, LamJointNo, LamJointAuto, LamJointSemiAuto,
+                LamJointHand, LamJointTwoPiece, LamJointLockBottom, LamJointFourPoint,
+                LamJointPunch, LamPackNo, LamPackStrap, LamPackStrapBaGuard, LamPackShrink,
+                LamPackMotherBox, LamPackNylon, LamPackPallete, LamBelongZinkPrice,
+                LamBelongDiePrice, LamBelongKelishePrice, LamBelongHandlePrice, LamBelongTalcPrice,
+                LamBelongCardBoardUnitFee, LamBelongSheetUnitFee, LamBelongPrintUnitFee,
+                LamBelongColorUnitFee, LamBelongCoverUnitFee, LamBelongLaminateUnitFee,
+                LamBelongJointUnitFee, LamBelongPackUnitFee, LamBelongTransportUnitFee,
+                LamOtherCosts, LamCalcBelongCosts, LamBelongCosts, LamPrintType,
+                LamCoverLen, LamCoverWid, LamCoverGlassy, LamCoverMatt, LamCoverMetallize,
+                LamCoverVerni, LamCoverUV, LamDesc, Des_RowDesc, Num_ActualFeeAdjust
+            FROM Tss_SalInvoice_Dt
+            WHERE SiSalInvoice_Hd = @SiContractRepeat;
+
+            ---------------------------
+            -- Insert steps for each new DT
+            ---------------------------
+            INSERT INTO dbo.Tss_SalStepsOfGoodsDelivery
+            (
+                SiPrcPackagingTypes, SiSalInvoice_Dt, Num_StepOfDeliverySeq, Dat_StepOfDeliveryDate,
+                Num_GdsNotProducingNo, Num_StepOfDeliveryNo, Des_StepOfDeliveryComments,
+                Num_NoInPackage, Num_GdsProducedNoInStep
+            )
+            SELECT 
+                S.SiPrcPackagingTypes,
+                M.NewSiSalInvoice_Dt,
+                S.Num_StepOfDeliverySeq,
+                @DatDelivery,
+                S.Num_GdsNotProducingNo,
+                S.Num_StepOfDeliveryNo,
+                S.Des_StepOfDeliveryComments,
+                S.Num_NoInPackage,
+                S.Num_GdsProducedNoInStep
+            FROM Tss_SalStepsOfGoodsDelivery S
+            INNER JOIN @Map M ON S.SiSalInvoice_Dt = M.OldSiSalInvoice_Dt;
+        END;
+
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+
+        -- Rethrow error
+        THROW;
+    END CATCH;
+END;
+
+GO
+
+alter VIEW Tss_RapRecCheckGhabzRep1Vw
+AS
+SELECT        dbo.Tss_RapReceivedCheque.Cod_RapReceivedChequeCode AS GhabzNo, dbo.Tss_PubCustomCodes.Des_CustomCodesDesc AS BankName, Tss_PubPersonsViw_1.Cod_PubPersonCode AS RecieverCode, 
+                         Tss_PubPersonsViw_1.Des_FullName AS RecieverName, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeEndDate AS UsanceDate, dbo.Tss_RapReceivedCheque.Num_RapReceivedChequeAmount AS ChequeAmount, 
+                         dbo.Tss_RapReceivedCheque.Cod_RapReceivedChqBankCode AS BankBranchCode, dbo.Tss_RapReceivedCheque.Cod_RapReceivedChequeSerial AS ChequeSerial, 
+                         dbo.Tss_RapReceivedCheque.Des_RapReceivedChequeDesc AS Tozihat, dbo.Tss_RapReceivedCheque.Des_RapReceivedChequeRecieptDesc AS RecieptTozih, dbo.Tss_RapReceivedCheque.Sta_ChekRecieptMainOrNot, 
+                         dbo.Tss_RapReceivedCheque.SiRapReceivedCheque, dbo.Tss_RapReceivedCheque.SiPubPersonsSpec, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeCngDate, 
+                         dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeVosoolDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeBargashtDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeCancelDate, 
+                         dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeToPerDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeToBankDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeHoghughiDate, 
+                         dbo.Tss_RapReceivedCheque.SiPubSubLocations, dbo.Tss_RapReceivedCheque.SiRapCashDefine, dbo.Tss_RapReceivedCheque.SiPubCustomCodes, Tss_PubPersonsViw_2.Cod_PubPersonCode AS GiverCode, 
+                         Tss_PubPersonsViw_2.Des_FullName AS GiverName, Tss_PubPersonsViw_2.Cod_PubPersonCode, Tss_PubPersonsViw_2.Des_FullName, dbo.Tss_RapRecChequeToBankVw.Sta_CheckToBankState,
+                             (SELECT        TOP (1) dbo.Tss_PubPersonsViw.Des_FullName
+                                FROM            dbo.Tss_RapRecChequeToBank INNER JOIN
+                                                         dbo.Tss_PubPersonsViw ON dbo.Tss_RapRecChequeToBank.SiPubPersonsSpec = dbo.Tss_PubPersonsViw.SiPubPersonsSpec
+                                WHERE        (dbo.Tss_RapRecChequeToBank.Sta_CheckToBankState < 3) AND (dbo.Tss_RapRecChequeToBank.SiRapReceivedCheque = dbo.Tss_RapReceivedCheque.SiRapReceivedCheque)
+                                ORDER BY dbo.Tss_RapRecChequeToBank.SiRapRecChequeToBank desc) AS GirandehDesc,
+                             (SELECT        TOP (1) Tss_PubPersonsViw_3.Cod_PubPersonCode
+                                FROM            dbo.Tss_RapRecChequeToBank AS Tss_RapRecChequeToBank_1 INNER JOIN
+                                                         dbo.Tss_PubPersonsViw AS Tss_PubPersonsViw_3 ON Tss_RapRecChequeToBank_1.SiPubPersonsSpec = Tss_PubPersonsViw_3.SiPubPersonsSpec
+                                WHERE        (Tss_RapRecChequeToBank_1.Sta_CheckToBankState < 3) AND (Tss_RapRecChequeToBank_1.SiRapReceivedCheque = dbo.Tss_RapReceivedCheque.SiRapReceivedCheque)
+                                ORDER BY Tss_RapRecChequeToBank_1.SiRapRecChequeToBank desc) AS GirandehCode, dbo.Tss_RapReceivedCheque.Dat_EsterdadToPer, dbo.Tss_RapReceivedCheque.Dat_EsterdadToCashier, 
+                         dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeToAgainDate, dbo.Tss_RapReceivedCheque.SiRapRecievedChequeRef_RefrenceHd, dbo.Tss_RapReceivedCheque.SiRapBehalfDefineHd, 
+                         dbo.Tss_RapReceivedCheque.Sta_CalcInReturnRep, dbo.Tss_RapReceivedCheque.Sta_RapReceivedChequeState, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeRegDate AS RegDate, 
+                         Tss_PubPersonsViw_4.Cod_PubPersonCode AS Expr1, Tss_PubPersonsViw_4.Des_FullName AS Expr2, Tss_PubPersonsViw_2.SiPerRelatedSaler,
+                         dbo.Tss_RapReceivedCheque.Des_ReceivedChequeSayadiCode,dbo.Tss_RapReceivedCheque.Des_ReceivedChequeSayadiNationalCode,
+    dbo.Tss_RapReceivedCheque.Sta_IsChecqueElectronic
+FROM            dbo.Tss_PubPersonsViw AS Tss_PubPersonsViw_4 RIGHT OUTER JOIN
+                         dbo.Tss_RapReceivedCheque INNER JOIN
+                         dbo.Tss_RapCashDefine ON dbo.Tss_RapReceivedCheque.SiRapCashDefine = dbo.Tss_RapCashDefine.SiRapCashDefine INNER JOIN
+                         dbo.Tss_RapCashOwners ON dbo.Tss_RapCashDefine.SiRapCashDefine = dbo.Tss_RapCashOwners.SiRapCashDefine INNER JOIN
+                         dbo.Tss_PubPersonsViw AS Tss_PubPersonsViw_1 ON dbo.Tss_RapCashOwners.SiPubPersonsSpec = Tss_PubPersonsViw_1.SiPubPersonsSpec INNER JOIN
+                         dbo.Tss_PubPersonsViw AS Tss_PubPersonsViw_2 ON dbo.Tss_RapReceivedCheque.SiPubPersonsSpec = Tss_PubPersonsViw_2.SiPubPersonsSpec ON 
+                         Tss_PubPersonsViw_4.SiPubPersonsSpec = Tss_PubPersonsViw_2.SiPerRelatedSaler LEFT OUTER JOIN
+                         dbo.Tss_RapRecChequeToBankVw ON dbo.Tss_RapReceivedCheque.SiRapReceivedCheque = dbo.Tss_RapRecChequeToBankVw.SiRapReceivedCheque LEFT OUTER JOIN
+                         dbo.Tss_PubCustomCodes ON dbo.Tss_RapReceivedCheque.SiPubCustomCodes = dbo.Tss_PubCustomCodes.SiPubCustomCodes
+GROUP BY dbo.Tss_PubCustomCodes.Des_CustomCodesDesc, Tss_PubPersonsViw_1.Cod_PubPersonCode, Tss_PubPersonsViw_1.Des_FullName, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeEndDate, 
+                         dbo.Tss_RapReceivedCheque.Num_RapReceivedChequeAmount, dbo.Tss_RapReceivedCheque.Cod_RapReceivedChqBankCode, dbo.Tss_RapReceivedCheque.Cod_RapReceivedChequeSerial, 
+                         dbo.Tss_RapReceivedCheque.SiRapReceivedCheque, dbo.Tss_RapReceivedCheque.Cod_RapReceivedChequeCode, Tss_PubPersonsViw_1.Des_FullName, Tss_PubPersonsViw_1.Cod_PubPersonCode, 
+                         dbo.Tss_RapReceivedCheque.Des_RapReceivedChequeDesc, dbo.Tss_RapReceivedCheque.Des_RapReceivedChequeRecieptDesc, dbo.Tss_RapReceivedCheque.Sta_ChekRecieptMainOrNot, 
+                         dbo.Tss_RapReceivedCheque.SiPubPersonsSpec, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeCngDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeVosoolDate, 
+                         dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeBargashtDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeCancelDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeToPerDate, 
+                         dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeToBankDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeHoghughiDate, dbo.Tss_RapReceivedCheque.SiPubSubLocations, 
+                         dbo.Tss_RapReceivedCheque.SiRapCashDefine, dbo.Tss_RapReceivedCheque.SiPubCustomCodes, Tss_PubPersonsViw_2.Cod_PubPersonCode, Tss_PubPersonsViw_2.Des_FullName, 
+                         Tss_PubPersonsViw_2.Cod_PubPersonCode, Tss_PubPersonsViw_2.Des_FullName, dbo.Tss_RapRecChequeToBankVw.Sta_CheckToBankState, dbo.Tss_RapReceivedCheque.Dat_EsterdadToPer, 
+                         dbo.Tss_RapReceivedCheque.Dat_EsterdadToCashier, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeToAgainDate, dbo.Tss_RapReceivedCheque.SiRapRecievedChequeRef_RefrenceHd, 
+                         dbo.Tss_RapReceivedCheque.SiRapBehalfDefineHd, dbo.Tss_RapReceivedCheque.Sta_CalcInReturnRep, dbo.Tss_RapReceivedCheque.Sta_RapReceivedChequeState, 
+                         dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeRegDate, Tss_PubPersonsViw_4.Cod_PubPersonCode, Tss_PubPersonsViw_4.Des_FullName, 
+                         Tss_PubPersonsViw_2.SiPerRelatedSaler, dbo.Tss_RapReceivedCheque.Des_ReceivedChequeSayadiCode,
+                         dbo.Tss_RapReceivedCheque.Des_ReceivedChequeSayadiNationalCode, dbo.Tss_RapReceivedCheque.Sta_IsChecqueElectronic
+
+
+GO
