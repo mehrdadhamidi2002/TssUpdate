@@ -3515,3 +3515,1521 @@ END
 
 GO
 
+-- Script to create or alter the Tss_GenDates table
+
+DECLARE @TableName NVARCHAR(128) = 'Tss_GenDates'
+DECLARE @SchemaName NVARCHAR(128) = 'dbo'
+DECLARE @FullTableName NVARCHAR(256) = @SchemaName + '.' + @TableName
+
+-- Check if table exists
+IF NOT EXISTS (
+    SELECT 1 
+    FROM sys.objects 
+    WHERE object_id = OBJECT_ID(@FullTableName) 
+    AND type = 'U'
+)
+BEGIN
+    -- Table doesn't exist, create it
+    PRINT 'Table ' + @FullTableName + ' does not exist. Creating...'
+    
+    CREATE TABLE [dbo].[Tss_GenDates](
+        [SiGenDates] [numeric](18, 0) IDENTITY(1,1) NOT NULL,
+        [Dat_GenShamsiDate] [varchar](10) NOT NULL,
+        [Dat_GenMiladiDate] [varchar](10) NOT NULL,
+        [Dat_GenGhamariDate] [varchar](500) NULL,
+        [Num_GenDayNo] [smallint] NOT NULL,
+        [IsHoliday] [bit] NULL,
+        [HolidayTitle] [nvarchar](500) NULL,
+        [StmGenDates] [timestamp] NULL,
+        CONSTRAINT [PK_TSS_GENDATES] PRIMARY KEY CLUSTERED 
+        (
+            [SiGenDates] ASC
+        ) WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, FILLFACTOR = 90, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+    ) ON [PRIMARY]
+    
+    PRINT 'Table ' + @FullTableName + ' created successfully.'
+END
+ELSE
+BEGIN
+    -- Table exists, compare and apply changes
+    PRINT 'Table ' + @FullTableName + ' exists. Checking for differences...'
+    
+    -- 1. Check and add missing columns
+    -- SiGenDates
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM sys.columns 
+        WHERE object_id = OBJECT_ID(@FullTableName) 
+        AND name = 'SiGenDates'
+    )
+    BEGIN
+        PRINT 'Adding column SiGenDates...'
+        ALTER TABLE [dbo].[Tss_GenDates] 
+        ADD [SiGenDates] [numeric](18, 0) IDENTITY(1,1) NOT NULL
+    END
+    
+    -- Dat_GenShamsiDate
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM sys.columns 
+        WHERE object_id = OBJECT_ID(@FullTableName) 
+        AND name = 'Dat_GenShamsiDate'
+    )
+    BEGIN
+        PRINT 'Adding column Dat_GenShamsiDate...'
+        ALTER TABLE [dbo].[Tss_GenDates] 
+        ADD [Dat_GenShamsiDate] [varchar](10) NOT NULL
+    END
+    
+    -- Dat_GenMiladiDate
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM sys.columns 
+        WHERE object_id = OBJECT_ID(@FullTableName) 
+        AND name = 'Dat_GenMiladiDate'
+    )
+    BEGIN
+        PRINT 'Adding column Dat_GenMiladiDate...'
+        ALTER TABLE [dbo].[Tss_GenDates] 
+        ADD [Dat_GenMiladiDate] [varchar](10) NOT NULL
+    END
+    
+    -- Dat_GenGhamariDate
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM sys.columns 
+        WHERE object_id = OBJECT_ID(@FullTableName) 
+        AND name = 'Dat_GenGhamariDate'
+    )
+    BEGIN
+        PRINT 'Adding column Dat_GenGhamariDate...'
+        ALTER TABLE [dbo].[Tss_GenDates] 
+        ADD [Dat_GenGhamariDate] [varchar](500) NULL
+    END
+    
+    -- Num_GenDayNo
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM sys.columns 
+        WHERE object_id = OBJECT_ID(@FullTableName) 
+        AND name = 'Num_GenDayNo'
+    )
+    BEGIN
+        PRINT 'Adding column Num_GenDayNo...'
+        ALTER TABLE [dbo].[Tss_GenDates] 
+        ADD [Num_GenDayNo] [smallint] NOT NULL
+    END
+    
+    -- IsHoliday
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM sys.columns 
+        WHERE object_id = OBJECT_ID(@FullTableName) 
+        AND name = 'IsHoliday'
+    )
+    BEGIN
+        PRINT 'Adding column IsHoliday...'
+        ALTER TABLE [dbo].[Tss_GenDates] 
+        ADD [IsHoliday] [bit] NULL
+    END
+    
+    -- HolidayTitle
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM sys.columns 
+        WHERE object_id = OBJECT_ID(@FullTableName) 
+        AND name = 'HolidayTitle'
+    )
+    BEGIN
+        PRINT 'Adding column HolidayTitle...'
+        ALTER TABLE [dbo].[Tss_GenDates] 
+        ADD [HolidayTitle] [nvarchar](500) NULL
+    END
+    
+    -- StmGenDates
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM sys.columns 
+        WHERE object_id = OBJECT_ID(@FullTableName) 
+        AND name = 'StmGenDates'
+    )
+    BEGIN
+        PRINT 'Adding column StmGenDates...'
+        ALTER TABLE [dbo].[Tss_GenDates] 
+        ADD [StmGenDates] [timestamp] NULL
+    END
+    
+    -- 2. Check and modify column data types if needed
+    
+    -- Check Dat_GenShamsiDate
+    IF EXISTS (
+        SELECT 1 
+        FROM sys.columns c
+        INNER JOIN sys.types t ON c.user_type_id = t.user_type_id
+        WHERE c.object_id = OBJECT_ID(@FullTableName) 
+        AND c.name = 'Dat_GenShamsiDate'
+        AND (t.name != 'varchar' OR c.max_length != 10 OR c.is_nullable != 0)
+    )
+    BEGIN
+        PRINT 'Modifying column Dat_GenShamsiDate data type...'
+        ALTER TABLE [dbo].[Tss_GenDates] 
+        ALTER COLUMN [Dat_GenShamsiDate] [varchar](10) NOT NULL
+    END
+    
+    -- Check Dat_GenMiladiDate
+    IF EXISTS (
+        SELECT 1 
+        FROM sys.columns c
+        INNER JOIN sys.types t ON c.user_type_id = t.user_type_id
+        WHERE c.object_id = OBJECT_ID(@FullTableName) 
+        AND c.name = 'Dat_GenMiladiDate'
+        AND (t.name != 'varchar' OR c.max_length != 10 OR c.is_nullable != 0)
+    )
+    BEGIN
+        PRINT 'Modifying column Dat_GenMiladiDate data type...'
+        ALTER TABLE [dbo].[Tss_GenDates] 
+        ALTER COLUMN [Dat_GenMiladiDate] [varchar](10) NOT NULL
+    END
+    
+    -- Check Dat_GenGhamariDate
+    IF EXISTS (
+        SELECT 1 
+        FROM sys.columns c
+        INNER JOIN sys.types t ON c.user_type_id = t.user_type_id
+        WHERE c.object_id = OBJECT_ID(@FullTableName) 
+        AND c.name = 'Dat_GenGhamariDate'
+        AND (t.name != 'varchar' OR c.max_length != 500 OR c.is_nullable != 1)
+    )
+    BEGIN
+        PRINT 'Modifying column Dat_GenGhamariDate data type...'
+        ALTER TABLE [dbo].[Tss_GenDates] 
+        ALTER COLUMN [Dat_GenGhamariDate] [varchar](500) NULL
+    END
+    
+    -- Check Num_GenDayNo
+    IF EXISTS (
+        SELECT 1 
+        FROM sys.columns c
+        INNER JOIN sys.types t ON c.user_type_id = t.user_type_id
+        WHERE c.object_id = OBJECT_ID(@FullTableName) 
+        AND c.name = 'Num_GenDayNo'
+        AND (t.name != 'smallint' OR c.is_nullable != 0)
+    )
+    BEGIN
+        PRINT 'Modifying column Num_GenDayNo data type...'
+        ALTER TABLE [dbo].[Tss_GenDates] 
+        ALTER COLUMN [Num_GenDayNo] [smallint] NOT NULL
+    END
+    
+    -- Check IsHoliday
+    IF EXISTS (
+        SELECT 1 
+        FROM sys.columns c
+        INNER JOIN sys.types t ON c.user_type_id = t.user_type_id
+        WHERE c.object_id = OBJECT_ID(@FullTableName) 
+        AND c.name = 'IsHoliday'
+        AND (t.name != 'bit' OR c.is_nullable != 1)
+    )
+    BEGIN
+        PRINT 'Modifying column IsHoliday data type...'
+        ALTER TABLE [dbo].[Tss_GenDates] 
+        ALTER COLUMN [IsHoliday] [bit] NULL
+    END
+    
+    -- Check HolidayTitle
+    IF EXISTS (
+        SELECT 1 
+        FROM sys.columns c
+        INNER JOIN sys.types t ON c.user_type_id = t.user_type_id
+        WHERE c.object_id = OBJECT_ID(@FullTableName) 
+        AND c.name = 'HolidayTitle'
+        AND (t.name != 'nvarchar' OR c.max_length != 1000 OR c.is_nullable != 1)
+    )
+    BEGIN
+        PRINT 'Modifying column HolidayTitle data type...'
+        ALTER TABLE [dbo].[Tss_GenDates] 
+        ALTER COLUMN [HolidayTitle] [nvarchar](500) NULL
+    END
+    
+    -- 3. Check and create primary key if missing
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM sys.key_constraints 
+        WHERE parent_object_id = OBJECT_ID(@FullTableName) 
+        AND type = 'PK'
+        AND name = 'PK_TSS_GENDATES'
+    )
+    BEGIN
+        PRINT 'Creating primary key PK_TSS_GENDATES...'
+        ALTER TABLE [dbo].[Tss_GenDates]
+        ADD CONSTRAINT [PK_TSS_GENDATES] PRIMARY KEY CLUSTERED 
+        (
+            [SiGenDates] ASC
+        ) WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, FILLFACTOR = 90, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+    END
+    
+    PRINT 'Table ' + @FullTableName + ' verified and updated successfully.'
+END
+
+GO
+
+alter PROCEDURE Tss_AccUntAccountReviewRStp
+(  
+   @InternalWhere VarChar(8000)='',
+   @Where VarChar(8000)='',
+   @Order VarChar(8000)='',
+   @DsFromDate VarChar(10)='1399/01/01',
+   @DsToDate VarChar(10)='1399/03/13',
+   @SiAccFinancePeriod Numeric=20,
+   @SiPubSubLocations varchar(500)='1,2',
+   @Sta_Start SmallInt=0,
+   @Sta_End SmallInt=0,
+   @Sta_Close SmallInt=0,
+   @FlgLevel SmallInt=2,
+	@FlgTafType SmallInt=0,
+   @SiSelected VarChar(50)='',
+   @Cod_AccountLevel1 VarChar(50)='',
+   @Cod_AccountLevel2 VarChar(50)='',
+   @StaBaMandeh smallint=0
+) 
+
+AS
+
+Set arithabort ON
+Set concat_null_yields_null ON
+Set ansi_nulls ON
+Set ansi_null_dflt_on ON
+Set ansi_padding ON
+Set ansi_warnings ON
+Set quoted_identifier ON
+
+If @InternalWhere<>''
+   Set @InternalWhere=' Where '+@InternalWhere
+If @Where<>''
+   Set @Where=' Where '+@Where
+If @Order<>''
+   Set @Order=' Order By '+@Order
+else
+   Set @Order=' Order By Acc_Code'
+
+Declare
+   @WhType VarChar(500),
+   @SqlTxt VarCHar(4000),
+	@AccAllDocs smallint,
+   @TafName VarChar(100)
+
+SELECT 
+	SiAccFinancePeriodToPlace
+Into #TempTable
+FROM         
+	dbo.Tss_AccFinancePeriodToPlace
+Where
+	(SiPubSubLocations in (select * from dbo.Tss_StdStringSiFindUdf(@SiPubSubLocations)))
+--select * from #TempTable
+Set @WhType=''
+If @Sta_Start=0
+   SELECT @WhType=convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 0)
+If @Sta_End=0
+   If @WhType=''
+      SELECT @WhType=convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 1)
+   Else
+      SELECT @WhType=@WhType+','+convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 1)
+If @Sta_Close=0
+   If @WhType=''
+      SELECT @WhType=convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup =3)
+   Else
+      SELECT @WhType=@WhType+','+convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 3)
+
+If @FlgTafType=0
+   Set @TafName='SiPubPersonsSpec1'
+If @FlgTafType=1
+   Set @TafName='SiPubCostCenter1'
+If @FlgTafType=2
+   Set @TafName='SiPubProjects1'
+If @FlgTafType=3
+   Set @TafName='SiPurOrder_Hd1'
+
+select @AccAllDocs = dbo.Tss_StdFindSystemParamValue('AccAllDocs')
+
+If @FlgLevel=1
+Begin
+   Set @SqlTxt=
+   'SELECT     
+      left(cBook.Cod_AccountCode,2) Acc_Code, 
+      substring(cBook.Cod_AccountCode,3,2) as Cod_AccountLevel2, 
+      substring(cBook.Cod_AccountCode,5,2) as Cod_AccountLevel3, 
+      cBook.SiAccCodeBook as SiAccCodeBook,
+      vDet.Num_VdetDebtAmount, 
+      vDet.Num_VdetCreditAmount
+   FROM         
+      dbo.Tss_AccCodeBook cBook 
+      INNER JOIN dbo.Tss_AccVoucher_Dt vDet ON cBook.SiAccCodeBook = vDet.SiAccCodeBook 
+      INNER JOIN dbo.Tss_AccVoucher_Hd vHed ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd
+   WHERE '
+
+	if @AccAllDocs=0    
+	Set @SqlTxt=@SqlTxt+
+	      '(vHed.Sta_VochStatus >= 3) AND (vHed.Sta_VochStatus <> 5) AND
+			(vHed.SiAccFinancePeriodToPlace in (select SiAccFinancePeriodToPlace from #TempTable)) AND
+	      (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+')'
+	else
+	Set @SqlTxt=@SqlTxt+
+	      '(vHed.Sta_VochStatus >= 3) AND --(vHed.Sta_VochStatus <> 5) AND
+			(vHed.SiAccFinancePeriodToPlace in (select SiAccFinancePeriodToPlace from #TempTable)) AND
+	      (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+')'
+
+	if @SiSelected<>''
+	Set @SqlTxt=@SqlTxt+ ' and (vDet.' +@TafName+'='+@SiSelected+') '
+
+   If @WhType<>''
+      Set @SqlTxt=@SqlTxt+' AND (vHed.SiAccVoucherType Not In ('+@WhType+'))'
+
+   Set @SqlTxt=
+      'Select
+         Ddd2.Acc_Code,
+         Ddd2.SiAccCodeBook,  -- Qualified with Ddd2 alias
+         Ddd2.Acc_Bed,
+         Ddd2.Acc_Bes,
+         Case When Ddd2.Acc_Bed>Ddd2.Acc_Bes Then Ddd2.Acc_Bed-Ddd2.Acc_Bes Else 0 End As Rst_Bed,
+         Case When Ddd2.Acc_Bes>Ddd2.Acc_Bed Then Ddd2.Acc_Bes-Ddd2.Acc_Bed Else 0 End As Rst_Bes,
+         dbo.Tss_AccCodeBook.Des_AccountDesc,
+         dbo.Tss_AccCodeBook.Sta_AccountLeaf,
+         dbo.Tss_AccCodeBook.Sta_TafType1 
+      From 
+      (
+         Select 
+            Acc_Code,
+            SiAccCodeBook,
+            Sum(Num_VdetDebtAmount) As Acc_Bed,
+            Sum(Num_VdetCreditAmount) As Acc_Bes
+         From 
+         ('+@SqlTxt+'
+
+         ) Ddd
+         Group By Acc_Code, SiAccCodeBook
+      ) Ddd2 
+      INNER JOIN dbo.Tss_AccCodeBook ON 
+      Ddd2.Acc_Code = dbo.Tss_AccCodeBook.Cod_AccountCode'
+End
+If @FlgLevel=2
+Begin
+Set @SqlTxt=
+   'SELECT     
+      left(cBook.Cod_AccountCode,4) As Acc_Code, 
+      substring(cBook.Cod_AccountCode,3,2) as Cod_AccountLevel2, 
+      substring(cBook.Cod_AccountCode,5,2) as Cod_AccountLevel3, 
+      cBook.SiAccCodeBook as SiAccCodeBook,
+      vDet.Num_VdetDebtAmount, 
+      vDet.Num_VdetCreditAmount
+   FROM         
+      dbo.Tss_AccCodeBook cBook 
+      INNER JOIN dbo.Tss_AccVoucher_Dt vDet ON cBook.SiAccCodeBook = vDet.SiAccCodeBook 
+      INNER JOIN dbo.Tss_AccVoucher_Hd vHed ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd
+   WHERE  '
+
+	if @AccAllDocs=0    
+	Set @SqlTxt=@SqlTxt+
+	      '(vHed.Sta_VochStatus >= 3) AND (vHed.Sta_VochStatus <> 5) AND
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) and
+	      (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+')' 
+	else
+	Set @SqlTxt=@SqlTxt+
+	      '(vHed.Sta_VochStatus >= 3) AND --(vHed.Sta_VochStatus <> 5) AND
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) and
+	      (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+')'
+	
+	if @Cod_AccountLevel1<>'' 
+		Set @SqlTxt=@SqlTxt+'AND (left(cBook.Cod_AccountCode,2)='+''''+@Cod_AccountLevel1+''''+')'
+	else
+		Set @SqlTxt=@SqlTxt--+' AND (Len(cBook.Cod_AccountCode)=4)'
+
+
+	if @SiSelected<>''
+	Set @SqlTxt=@SqlTxt+ ' and (vDet.' +@TafName+'='+@SiSelected+') '
+	
+   If @WhType<>''
+      Set @SqlTxt=@SqlTxt+' AND (vHed.SiAccVoucherType Not In ('+@WhType+'))'
+   Set @SqlTxt=
+      'Select
+         Ddd2.Acc_Code,
+         Ddd2.SiAccCodeBook,  -- Qualified with Ddd2 alias
+         Ddd2.Acc_Bed,
+         Ddd2.Acc_Bes,
+         Case When Ddd2.Acc_Bed>Ddd2.Acc_Bes Then Ddd2.Acc_Bed-Ddd2.Acc_Bes Else 0 End As Rst_Bed,
+         Case When Ddd2.Acc_Bes>Ddd2.Acc_Bed Then Ddd2.Acc_Bes-Ddd2.Acc_Bed Else 0 End As Rst_Bes,
+         dbo.Tss_AccCodeBook.Des_AccountDesc,
+         dbo.Tss_AccCodeBook.Sta_AccountLeaf,
+         dbo.Tss_AccCodeBook.Sta_TafType1 
+      From 
+      (
+         Select 
+            Acc_Code,
+            SiAccCodeBook,
+            Sum(Num_VdetDebtAmount) As Acc_Bed,
+            Sum(Num_VdetCreditAmount) As Acc_Bes
+         From 
+         ('+@SqlTxt+'
+
+         ) Ddd
+         Group By Acc_Code, SiAccCodeBook
+      ) Ddd2 
+      INNER JOIN dbo.Tss_AccCodeBook ON 
+      Ddd2.Acc_Code = dbo.Tss_AccCodeBook.Cod_AccountCode'
+End
+If @FlgLevel=3
+Begin
+   Set @SqlTxt=
+   'SELECT     
+      left(cBook.Cod_AccountCode,6) As Acc_Code, 
+      substring(cBook.Cod_AccountCode,3,2) as Cod_AccountLevel2, 
+      substring(cBook.Cod_AccountCode,5,2) as Cod_AccountLevel3, 
+      cBook.SiAccCodeBook as SiAccCodeBook,
+      vDet.Num_VdetDebtAmount, 
+      vDet.Num_VdetCreditAmount
+   FROM         
+      dbo.Tss_AccCodeBook cBook 
+      INNER JOIN dbo.Tss_AccVoucher_Dt vDet ON cBook.SiAccCodeBook = vDet.SiAccCodeBook 
+      INNER JOIN dbo.Tss_AccVoucher_Hd vHed ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd
+   WHERE '
+
+	if @AccAllDocs=0    
+	Set @SqlTxt=@SqlTxt+
+	      '(vHed.Sta_VochStatus >= 3) AND (vHed.Sta_VochStatus <> 5) AND
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) and
+	      (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+')'
+	else
+	Set @SqlTxt=@SqlTxt+
+	      '(vHed.Sta_VochStatus >= 3) AND --(vHed.Sta_VochStatus <> 5) AND
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) and
+	      (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+')'
+
+	if len(@Cod_AccountLevel2)=4
+		Set @SqlTxt=@SqlTxt+'AND (left(cBook.Cod_AccountCode,4)='+''''+@Cod_AccountLevel2+''''+')'
+	if @Cod_AccountLevel2=''
+		Set @SqlTxt=@SqlTxt+'AND (len(cBook.Cod_AccountCode)=6)'
+	
+	if @SiSelected<>''
+	Set @SqlTxt=@SqlTxt+ ' and (vDet.' +@TafName+'='+@SiSelected+') '
+
+   If @WhType<>''
+      Set @SqlTxt=@SqlTxt+' AND (vHed.SiAccVoucherType Not In ('+@WhType+'))'
+   Set @SqlTxt=
+      'Select
+         Ddd2.Acc_Code,
+         Ddd2.SiAccCodeBook,  -- Qualified with Ddd2 alias
+         Ddd2.Acc_Bed,
+         Ddd2.Acc_Bes,
+         Case When Ddd2.Acc_Bed>Ddd2.Acc_Bes Then Ddd2.Acc_Bed-Ddd2.Acc_Bes Else 0 End As Rst_Bed,
+         Case When Ddd2.Acc_Bes>Ddd2.Acc_Bed Then Ddd2.Acc_Bes-Ddd2.Acc_Bed Else 0 End As Rst_Bes,
+         dbo.Tss_AccCodeBook.Des_AccountDesc,
+         dbo.Tss_AccCodeBook.Sta_AccountLeaf,
+         dbo.Tss_AccCodeBook.Sta_TafType1 
+      From 
+      (
+         Select 
+            Acc_Code,
+            SiAccCodeBook,
+            Sum(Num_VdetDebtAmount) As Acc_Bed,
+            Sum(Num_VdetCreditAmount) As Acc_Bes
+         From 
+         ('+@SqlTxt+'
+
+         ) Ddd
+         Group By Acc_Code, SiAccCodeBook
+      ) Ddd2 
+      INNER JOIN dbo.Tss_AccCodeBook ON 
+      Ddd2.Acc_Code = dbo.Tss_AccCodeBook.Cod_AccountCode'
+End
+Exec(
+'Select * From
+(
+   Select * From
+   ( '+@SqlTxt+
+   ' ) Ccc  '+@InternalWhere+'
+) CalcSel ' + @Where + @Order)
+print @SqlTxt
+
+
+go
+
+ALTER PROCEDURE Tss_AccUntAccountReviewTafsilRStp
+(  
+   @InternalWhere VarChar(8000)='',
+   @Where VarChar(8000)='',
+   @Order VarChar(8000)='',
+   @DsFromDate VarChar(10)='1390/01/01',
+   @DsToDate VarChar(10)='1397/12/29',
+   @SiAccFinancePeriod Numeric=9,
+   @SiPubSubLocations varchar(500)='1,2',
+   @Sta_Start SmallInt=0,
+   @Sta_End SmallInt=0,
+   @Sta_Close SmallInt=0,
+   @FlgLevel SmallInt=4,
+   @Cod_AccountCode VarChar(50)='611012',
+   @StaBaMandeh smallint=0
+) 
+
+AS
+
+Set arithabort ON
+Set concat_null_yields_null ON
+Set ansi_nulls ON
+Set ansi_null_dflt_on ON
+Set ansi_padding ON
+Set ansi_warnings ON
+Set quoted_identifier ON
+
+If @InternalWhere<>''
+   Set @InternalWhere=' Where '+@InternalWhere
+If @Where<>''
+   Set @Where=' Where '+@Where
+
+If @Order<>''
+   Set @Order=' Order By '+@Order
+else
+   Set @Order=' Order By convert(numeric,TafCode)'
+
+Declare
+   @WhType VarChar(20),
+   @SqlTxt VarCHar(4000),
+   @Sta_TafType1 SmallInt,
+   @SiAccCodeBook Numeric,
+	@AccAllDocs smallint
+
+select @AccAllDocs = dbo.Tss_StdFindSystemParamValue('AccAllDocs')
+
+SELECT 
+	SiAccFinancePeriodToPlace
+Into #TempTable
+FROM         
+	dbo.Tss_AccFinancePeriodToPlace
+Where
+--	(SiAccFinancePeriod=@SiAccFinancePeriod) And
+	(SiPubSubLocations in (select * from dbo.Tss_StdStringSiFindUdf(@SiPubSubLocations)))
+--select * from #TempTable
+SELECT     
+   @Sta_TafType1=Sta_TafType1, 
+   @SiAccCodeBook=SiAccCodeBook
+FROM
+   dbo.Tss_AccCodeBook cBook
+WHERE
+   (Cod_AccountCode = @Cod_AccountCode)
+
+Set @WhType=''
+If @Sta_Start=0
+   SELECT @WhType=convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 0)
+If @Sta_End=0
+   If @WhType=''
+      SELECT @WhType=convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 1)
+   Else
+      SELECT @WhType=@WhType+','+convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 1)
+If @Sta_Close=0
+   If @WhType=''
+      SELECT @WhType=convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup =3)
+   Else
+      SELECT @WhType=@WhType+','+convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 3)
+
+If @Sta_TafType1=1
+Begin
+   Set @SqlTxt=
+   '
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,  -- Added SiTaf column
+      Acc_Bed,
+      Acc_Bes,
+		Des_VdetDesc, 
+		Dat_AccVoucherDetDate, 
+		Num_VdetAmount,
+      Case When Acc_Bed>Acc_Bes Then Acc_Bed-Acc_Bes Else 0 End As Rst_Bed,
+      Case When Acc_Bes>Acc_Bed Then Acc_Bes-Acc_Bed Else 0 End As Rst_Bes,
+		dbo.Tss_FindRelatedSaler(TafCode) as RelatedSaler,
+		Des_CodeDescription
+   From
+   (
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,  -- Added SiTaf column
+      Sum(Num_VdetDebtAmount) Acc_Bed,
+      Sum(Num_VdetCreditAmount) Acc_Bes,
+		Des_VdetDesc, 
+		Dat_AccVoucherDetDate, 
+		Num_VdetAmount,
+		Des_CodeDescription
+   From
+   (
+      SELECT     
+         dbo.Tss_PubPersonsViw.Cod_PubPersonCode TafCode, 
+         dbo.Tss_PubPersonsViw.Des_FullName TafDesc,
+         dbo.Tss_PubPersonsViw.SiPubPersonsSpec as SiTaf,  -- SiPubPersonsSpec for @Sta_TafType1=1
+         vDet.Num_VdetDebtAmount, 
+         vDet.Num_VdetCreditAmount,
+			'''' Des_VdetDesc,
+			'''' Dat_AccVoucherDetDate,
+			$0.0 Num_VdetAmount,
+			dbo.Tss_PubPersonsViw.Des_CodeDescription
+      FROM         
+         dbo.Tss_AccVoucher_Dt vDet INNER JOIN dbo.Tss_AccVoucher_Hd vHed 
+         ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd INNER JOIN
+         dbo.Tss_PubPersonsViw ON vDet.SiPubPersonsSpec1 = dbo.Tss_PubPersonsViw.SiPubPersonsSpec
+      WHERE '
+	if @AccAllDocs=0
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3)  AND (vHed.Sta_VochStatus <> 5)  AND 
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+         (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
+	else
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3)  AND --(vHed.Sta_VochStatus <> 5)  AND 
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+         (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
+
+   If @WhType<>''
+      Set @SqlTxt=@SqlTxt+' AND (vHed.SiAccVoucherType Not In ('+@WhType+'))'
+   Set @SqlTxt=@SqlTxt+' ) Ddd '
+   Set @SqlTxt=@SqlTxt+' Group By TafCode, TafDesc, SiTaf, Des_VdetDesc, Dat_AccVoucherDetDate, Num_VdetAmount, Des_CodeDescription ) Dd2 '
+--print @SqlTxt
+End
+
+
+If @Sta_TafType1=2
+Begin
+   Set @SqlTxt=
+   '
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,  -- Added SiTaf column
+      Acc_Bed,
+      Acc_Bes,
+		Des_VdetDesc, 
+		Dat_AccVoucherDetDate, 
+		Num_VdetAmount,
+      Case When Acc_Bed>Acc_Bes Then Acc_Bed-Acc_Bes Else 0 End As Rst_Bed,
+      Case When Acc_Bes>Acc_Bed Then Acc_Bes-Acc_Bed Else 0 End As Rst_Bes,
+		dbo.Tss_FindRelatedSaler(TafCode) as RelatedSaler,
+		Des_CodeDescription
+   From
+   (
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,  -- Added SiTaf column
+      Sum(Num_VdetDebtAmount) Acc_Bed,
+      Sum(Num_VdetCreditAmount) Acc_Bes,
+		Des_VdetDesc, 
+		Dat_AccVoucherDetDate, 
+		Num_VdetAmount,
+		Des_CodeDescription
+   From
+   (
+      SELECT     
+         dbo.Tss_PubCostCenter.Cod_CostCenterCode TafCode,  
+         dbo.Tss_PubCostCenter.Des_CostCenterName TafDesc,
+         dbo.Tss_PubCostCenter.SiPubCostCenter as SiTaf,  -- SiPubCostCenter for @Sta_TafType1=2
+         vDet.Num_VdetDebtAmount, 
+         vDet.Num_VdetCreditAmount,
+			'''' Des_VdetDesc,
+			'''' Dat_AccVoucherDetDate,
+			$0.0 Num_VdetAmount,
+			dbo.Tss_PubCostCenter.Des_CodeDescription
+      FROM   
+         dbo.Tss_AccVoucher_Dt vDet INNER JOIN dbo.Tss_AccVoucher_Hd vHed 
+         ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd INNER JOIN
+         dbo.Tss_PubCostCenter ON vDet.SiPubCostCenter1 = dbo.Tss_PubCostCenter.SiPubCostCenter
+      WHERE '
+	if @AccAllDocs=0
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3)  AND (vHed.Sta_VochStatus <> 5)  AND  
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+	      (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
+	else
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3)  AND --(vHed.Sta_VochStatus <> 5)  AND  
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+	      (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
+
+If @WhType<>''
+      Set @SqlTxt=@SqlTxt+' AND (vHed.SiAccVoucherType Not In ('+@WhType+'))'
+   Set @SqlTxt=@SqlTxt+' ) Ddd
+   Group By TafCode, TafDesc, SiTaf, Des_VdetDesc, Dat_AccVoucherDetDate, Num_VdetAmount, Des_CodeDescription ) Dd2'
+End
+
+If @Sta_TafType1=3
+Begin
+   Set @SqlTxt=
+   '
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,  -- Added SiTaf column
+      Acc_Bed,
+      Acc_Bes,
+      Case When Acc_Bed>Acc_Bes Then Acc_Bed-Acc_Bes Else 0 End As Rst_Bed,
+      Case When Acc_Bes>Acc_Bed Then Acc_Bes-Acc_Bed Else 0 End As Rst_Bes,
+		dbo.Tss_FindRelatedSaler(TafCode) as RelatedSaler,
+		'''' as Des_CodeDescription
+   From
+   (
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,  -- Added SiTaf column
+      Sum(Num_VdetDebtAmount) Acc_Bed,
+      Sum(Num_VdetCreditAmount) Acc_Bes
+   From
+   (
+      SELECT     
+         dbo.Tss_PubProjects.Cod_ProjectsCode TafCode,  
+         dbo.Tss_PubProjects.Des_ProjectsThemeDesc TafDesc,
+         dbo.Tss_PubProjects.SiPubProjects as SiTaf,  -- SiPubProjects for @Sta_TafType1=3
+         vDet.Num_VdetDebtAmount, 
+         vDet.Num_VdetCreditAmount 
+      FROM         
+         dbo.Tss_AccVoucher_Dt vDet INNER JOIN dbo.Tss_AccVoucher_Hd vHed 
+         ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd INNER JOIN
+         dbo.Tss_PubProjects ON vDet.SiPubProjects1 = dbo.Tss_PubProjects.SiPubProjects
+      WHERE '
+	if @AccAllDocs=0
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3) AND (vHed.Sta_VochStatus <> 5)  AND  
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+         (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
+	else
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3) AND --(vHed.Sta_VochStatus <> 5)  AND  
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+         (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
+
+   If @WhType<>''
+      Set @SqlTxt=@SqlTxt+' AND (vHed.SiAccVoucherType Not In ('+@WhType+'))'
+   Set @SqlTxt=@SqlTxt+' ) Ddd
+   Group By TafCode, TafDesc, SiTaf ) Dd2'  -- Added SiTaf to GROUP BY
+End
+
+If @Sta_TafType1=4
+Begin
+   Set @SqlTxt=
+   '
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,  -- Added SiTaf column
+      Acc_Bed,
+      Acc_Bes,
+      Case When Acc_Bed>Acc_Bes Then Acc_Bed-Acc_Bes Else 0 End As Rst_Bed,
+      Case When Acc_Bes>Acc_Bed Then Acc_Bes-Acc_Bed Else 0 End As Rst_Bes,
+		dbo.Tss_FindRelatedSaler(TafCode) as RelatedSaler,
+		'''' Des_CodeDescription
+   From
+   (
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,  -- Added SiTaf column
+      Sum(Num_VdetDebtAmount) Acc_Bed,
+      Sum(Num_VdetCreditAmount) Acc_Bes
+   From
+   (
+      SELECT     
+         dbo.Tss_PurOrder_Hd.Cod_PurOrderCode TafCode,  
+         dbo.Tss_PurOrder_Hd.Des_PurOrderDesc TafDesc,
+         dbo.Tss_PurOrder_Hd.SiPurOrder_Hd as SiTaf,  -- SiPurOrder_Hd for @Sta_TafType1=4
+         vDet.Num_VdetDebtAmount, 
+         vDet.Num_VdetCreditAmount 
+      FROM         
+         dbo.Tss_AccVoucher_Dt vDet INNER JOIN dbo.Tss_AccVoucher_Hd vHed 
+         ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd INNER JOIN
+         dbo.Tss_PurOrder_Hd ON vDet.SiPurOrder_Hd1 = dbo.Tss_PurOrder_Hd.SiPurOrder_Hd
+      WHERE '
+	if @AccAllDocs=0
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3)  AND (vHed.Sta_VochStatus <> 5)  AND  
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+         (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
+	else
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3)  AND --(vHed.Sta_VochStatus <> 5)  AND  
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+         (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
+
+   If @WhType<>''
+      Set @SqlTxt=@SqlTxt+' AND (vHed.SiAccVoucherType Not In ('+@WhType+'))'
+   Set @SqlTxt=@SqlTxt+' ) Ddd
+   Group By TafCode, TafDesc, SiTaf ) Dd2'  -- Added SiTaf to GROUP BY
+End
+
+-- If @Sta_TafType1=0, return NULL for SiTaf
+If @Sta_TafType1=0
+Begin
+   Set @SqlTxt=
+   '
+   Select 
+      '''' TafCode,
+      '''' TafDesc,
+      NULL as SiTaf,  -- NULL when @Sta_TafType1=0
+      convert(numeric,0) Acc_Bed,
+      convert(numeric,0) Acc_Bes,
+      convert(numeric,0) Rst_Bed,
+      convert(numeric,0) Rst_Bes,
+      '''' Des_VdetDesc,
+      '''' Dat_AccVoucherDetDate,
+      convert(numeric,0) Num_VdetAmount,
+      '''' RelatedSaler,
+      '''' Des_CodeDescription
+   '
+End
+
+print @SqlTxt
+
+If @Sta_TafType1<>0
+Exec(
+'Select * From
+(
+   Select * From
+   ( '+@SqlTxt+
+   ' ) Ccc  '+@InternalWhere+'
+) CalcSel ' + @Where + @Order)
+Else
+Exec(@SqlTxt)
+
+GO
+
+alter PROCEDURE Tss_AccUntAccountReviewRStp
+(  
+   @InternalWhere VarChar(8000)='',
+   @Where VarChar(8000)='',
+   @Order VarChar(8000)='',
+   @DsFromDate VarChar(10)='1399/01/01',
+   @DsToDate VarChar(10)='1399/03/13',
+   @SiAccFinancePeriod Numeric=20,
+   @SiPubSubLocations varchar(500)='1,2',
+   @Sta_Start SmallInt=0,
+   @Sta_End SmallInt=0,
+   @Sta_Close SmallInt=0,
+   @FlgLevel SmallInt=2,
+	@FlgTafType SmallInt=0,
+   @SiSelected VarChar(50)='',
+   @Cod_AccountLevel1 VarChar(50)='',
+   @Cod_AccountLevel2 VarChar(50)='',
+   @StaBaMandeh smallint=0
+) 
+
+AS
+
+Set arithabort ON
+Set concat_null_yields_null ON
+Set ansi_nulls ON
+Set ansi_null_dflt_on ON
+Set ansi_padding ON
+Set ansi_warnings ON
+Set quoted_identifier ON
+
+If @InternalWhere<>''
+   Set @InternalWhere=' Where '+@InternalWhere
+If @Where<>''
+   Set @Where=' Where '+@Where
+If @Order<>''
+   Set @Order=' Order By '+@Order
+else
+   Set @Order=' Order By Acc_Code'
+
+Declare
+   @WhType VarChar(500),
+   @SqlTxt VarCHar(4000),
+	@AccAllDocs smallint,
+   @TafName VarChar(100)
+
+SELECT 
+	SiAccFinancePeriodToPlace
+Into #TempTable
+FROM         
+	dbo.Tss_AccFinancePeriodToPlace
+Where
+	(SiPubSubLocations in (select * from dbo.Tss_StdStringSiFindUdf(@SiPubSubLocations)))
+--select * from #TempTable
+Set @WhType=''
+If @Sta_Start=0
+   SELECT @WhType=convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 0)
+If @Sta_End=0
+   If @WhType=''
+      SELECT @WhType=convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 1)
+   Else
+      SELECT @WhType=@WhType+','+convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 1)
+If @Sta_Close=0
+   If @WhType=''
+      SELECT @WhType=convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup =3)
+   Else
+      SELECT @WhType=@WhType+','+convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 3)
+
+If @FlgTafType=0
+   Set @TafName='SiPubPersonsSpec1'
+If @FlgTafType=1
+   Set @TafName='SiPubCostCenter1'
+If @FlgTafType=2
+   Set @TafName='SiPubProjects1'
+If @FlgTafType=3
+   Set @TafName='SiPurOrder_Hd1'
+
+select @AccAllDocs = dbo.Tss_StdFindSystemParamValue('AccAllDocs')
+
+If @FlgLevel=1
+Begin
+   Set @SqlTxt=
+   'SELECT     
+      left(cBook.Cod_AccountCode,2) Acc_Code, 
+      substring(cBook.Cod_AccountCode,3,2) as Cod_AccountLevel2, 
+      substring(cBook.Cod_AccountCode,5,2) as Cod_AccountLevel3, 
+      cBook.SiAccCodeBook as SiAccCodeBook,
+      vDet.Num_VdetDebtAmount, 
+      vDet.Num_VdetCreditAmount
+   FROM         
+      dbo.Tss_AccCodeBook cBook 
+      INNER JOIN dbo.Tss_AccVoucher_Dt vDet ON cBook.SiAccCodeBook = vDet.SiAccCodeBook 
+      INNER JOIN dbo.Tss_AccVoucher_Hd vHed ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd
+   WHERE '
+
+	if @AccAllDocs=0    
+	Set @SqlTxt=@SqlTxt+
+	      '(vHed.Sta_VochStatus >= 3) AND (vHed.Sta_VochStatus <> 5) AND
+			(vHed.SiAccFinancePeriodToPlace in (select SiAccFinancePeriodToPlace from #TempTable)) AND
+	      (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+')'
+	else
+	Set @SqlTxt=@SqlTxt+
+	      '(vHed.Sta_VochStatus >= 3) AND --(vHed.Sta_VochStatus <> 5) AND
+			(vHed.SiAccFinancePeriodToPlace in (select SiAccFinancePeriodToPlace from #TempTable)) AND
+	      (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+')'
+
+	if @SiSelected<>''
+	Set @SqlTxt=@SqlTxt+ ' and (vDet.' +@TafName+'='+@SiSelected+') '
+
+   If @WhType<>''
+      Set @SqlTxt=@SqlTxt+' AND (vHed.SiAccVoucherType Not In ('+@WhType+'))'
+
+   Set @SqlTxt=
+      'Select
+         Ddd2.Acc_Code,
+         Ddd2.SiAccCodeBook,  -- Qualified with Ddd2 alias
+         Ddd2.Acc_Bed,
+         Ddd2.Acc_Bes,
+         Case When Ddd2.Acc_Bed>Ddd2.Acc_Bes Then Ddd2.Acc_Bed-Ddd2.Acc_Bes Else 0 End As Rst_Bed,
+         Case When Ddd2.Acc_Bes>Ddd2.Acc_Bed Then Ddd2.Acc_Bes-Ddd2.Acc_Bed Else 0 End As Rst_Bes,
+         dbo.Tss_AccCodeBook.Des_AccountDesc,
+         dbo.Tss_AccCodeBook.Sta_AccountLeaf,
+         dbo.Tss_AccCodeBook.Sta_TafType1 
+      From 
+      (
+         Select 
+            Acc_Code,
+            SiAccCodeBook,
+            Sum(Num_VdetDebtAmount) As Acc_Bed,
+            Sum(Num_VdetCreditAmount) As Acc_Bes
+         From 
+         ('+@SqlTxt+'
+
+         ) Ddd
+         Group By Acc_Code, SiAccCodeBook
+      ) Ddd2 
+      INNER JOIN dbo.Tss_AccCodeBook ON 
+      Ddd2.Acc_Code = dbo.Tss_AccCodeBook.Cod_AccountCode'
+End
+If @FlgLevel=2
+Begin
+Set @SqlTxt=
+   'SELECT     
+      left(cBook.Cod_AccountCode,4) As Acc_Code, 
+      substring(cBook.Cod_AccountCode,3,2) as Cod_AccountLevel2, 
+      substring(cBook.Cod_AccountCode,5,2) as Cod_AccountLevel3, 
+      cBook.SiAccCodeBook as SiAccCodeBook,
+      vDet.Num_VdetDebtAmount, 
+      vDet.Num_VdetCreditAmount
+   FROM         
+      dbo.Tss_AccCodeBook cBook 
+      INNER JOIN dbo.Tss_AccVoucher_Dt vDet ON cBook.SiAccCodeBook = vDet.SiAccCodeBook 
+      INNER JOIN dbo.Tss_AccVoucher_Hd vHed ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd
+   WHERE  '
+
+	if @AccAllDocs=0    
+	Set @SqlTxt=@SqlTxt+
+	      '(vHed.Sta_VochStatus >= 3) AND (vHed.Sta_VochStatus <> 5) AND
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) and
+	      (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+')' 
+	else
+	Set @SqlTxt=@SqlTxt+
+	      '(vHed.Sta_VochStatus >= 3) AND --(vHed.Sta_VochStatus <> 5) AND
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) and
+	      (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+')'
+	
+	if @Cod_AccountLevel1<>'' 
+		Set @SqlTxt=@SqlTxt+'AND (left(cBook.Cod_AccountCode,2)='+''''+@Cod_AccountLevel1+''''+')'
+	else
+		Set @SqlTxt=@SqlTxt--+' AND (Len(cBook.Cod_AccountCode)=4)'
+
+
+	if @SiSelected<>''
+	Set @SqlTxt=@SqlTxt+ ' and (vDet.' +@TafName+'='+@SiSelected+') '
+	
+   If @WhType<>''
+      Set @SqlTxt=@SqlTxt+' AND (vHed.SiAccVoucherType Not In ('+@WhType+'))'
+   Set @SqlTxt=
+      'Select
+         Ddd2.Acc_Code,
+         Ddd2.SiAccCodeBook,  -- Qualified with Ddd2 alias
+         Ddd2.Acc_Bed,
+         Ddd2.Acc_Bes,
+         Case When Ddd2.Acc_Bed>Ddd2.Acc_Bes Then Ddd2.Acc_Bed-Ddd2.Acc_Bes Else 0 End As Rst_Bed,
+         Case When Ddd2.Acc_Bes>Ddd2.Acc_Bed Then Ddd2.Acc_Bes-Ddd2.Acc_Bed Else 0 End As Rst_Bes,
+         dbo.Tss_AccCodeBook.Des_AccountDesc,
+         dbo.Tss_AccCodeBook.Sta_AccountLeaf,
+         dbo.Tss_AccCodeBook.Sta_TafType1 
+      From 
+      (
+         Select 
+            Acc_Code,
+            SiAccCodeBook,
+            Sum(Num_VdetDebtAmount) As Acc_Bed,
+            Sum(Num_VdetCreditAmount) As Acc_Bes
+         From 
+         ('+@SqlTxt+'
+
+         ) Ddd
+         Group By Acc_Code, SiAccCodeBook
+      ) Ddd2 
+      INNER JOIN dbo.Tss_AccCodeBook ON 
+      Ddd2.Acc_Code = dbo.Tss_AccCodeBook.Cod_AccountCode'
+End
+If @FlgLevel=3
+Begin
+   Set @SqlTxt=
+   'SELECT     
+      left(cBook.Cod_AccountCode,6) As Acc_Code, 
+      substring(cBook.Cod_AccountCode,3,2) as Cod_AccountLevel2, 
+      substring(cBook.Cod_AccountCode,5,2) as Cod_AccountLevel3, 
+      cBook.SiAccCodeBook as SiAccCodeBook,
+      vDet.Num_VdetDebtAmount, 
+      vDet.Num_VdetCreditAmount
+   FROM         
+      dbo.Tss_AccCodeBook cBook 
+      INNER JOIN dbo.Tss_AccVoucher_Dt vDet ON cBook.SiAccCodeBook = vDet.SiAccCodeBook 
+      INNER JOIN dbo.Tss_AccVoucher_Hd vHed ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd
+   WHERE '
+
+	if @AccAllDocs=0    
+	Set @SqlTxt=@SqlTxt+
+	      '(vHed.Sta_VochStatus >= 3) AND (vHed.Sta_VochStatus <> 5) AND
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) and
+	      (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+')'
+	else
+	Set @SqlTxt=@SqlTxt+
+	      '(vHed.Sta_VochStatus >= 3) AND --(vHed.Sta_VochStatus <> 5) AND
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) and
+	      (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+')'
+
+	if len(@Cod_AccountLevel2)=4
+		Set @SqlTxt=@SqlTxt+'AND (left(cBook.Cod_AccountCode,4)='+''''+@Cod_AccountLevel2+''''+')'
+	if @Cod_AccountLevel2=''
+		Set @SqlTxt=@SqlTxt+'AND (len(cBook.Cod_AccountCode)=6)'
+	
+	if @SiSelected<>''
+	Set @SqlTxt=@SqlTxt+ ' and (vDet.' +@TafName+'='+@SiSelected+') '
+
+   If @WhType<>''
+      Set @SqlTxt=@SqlTxt+' AND (vHed.SiAccVoucherType Not In ('+@WhType+'))'
+   Set @SqlTxt=
+      'Select
+         Ddd2.Acc_Code,
+         Ddd2.SiAccCodeBook,  -- Qualified with Ddd2 alias
+         Ddd2.Acc_Bed,
+         Ddd2.Acc_Bes,
+         Case When Ddd2.Acc_Bed>Ddd2.Acc_Bes Then Ddd2.Acc_Bed-Ddd2.Acc_Bes Else 0 End As Rst_Bed,
+         Case When Ddd2.Acc_Bes>Ddd2.Acc_Bed Then Ddd2.Acc_Bes-Ddd2.Acc_Bed Else 0 End As Rst_Bes,
+         dbo.Tss_AccCodeBook.Des_AccountDesc,
+         dbo.Tss_AccCodeBook.Sta_AccountLeaf,
+         dbo.Tss_AccCodeBook.Sta_TafType1 
+      From 
+      (
+         Select 
+            Acc_Code,
+            SiAccCodeBook,
+            Sum(Num_VdetDebtAmount) As Acc_Bed,
+            Sum(Num_VdetCreditAmount) As Acc_Bes
+         From 
+         ('+@SqlTxt+'
+
+         ) Ddd
+         Group By Acc_Code, SiAccCodeBook
+      ) Ddd2 
+      INNER JOIN dbo.Tss_AccCodeBook ON 
+      Ddd2.Acc_Code = dbo.Tss_AccCodeBook.Cod_AccountCode'
+End
+Exec(
+'Select * From
+(
+   Select * From
+   ( '+@SqlTxt+
+   ' ) Ccc  '+@InternalWhere+'
+) CalcSel ' + @Where + @Order)
+
+GO
+
+alter PROCEDURE Tss_AccUntAccountReviewTafsilRStp
+(  
+   @InternalWhere VarChar(8000)='',
+   @Where VarChar(8000)='',
+   @Order VarChar(8000)='',
+   @DsFromDate VarChar(10)='1390/01/01',
+   @DsToDate VarChar(10)='1397/12/29',
+   @SiAccFinancePeriod Numeric=9,
+   @SiPubSubLocations varchar(500)='1,2',
+   @Sta_Start SmallInt=0,
+   @Sta_End SmallInt=0,
+   @Sta_Close SmallInt=0,
+   @FlgLevel SmallInt=4,
+   @Cod_AccountCode VarChar(50)='611012',
+   @StaBaMandeh smallint=0
+) 
+
+AS
+
+Set arithabort ON
+Set concat_null_yields_null ON
+Set ansi_nulls ON
+Set ansi_null_dflt_on ON
+Set ansi_padding ON
+Set ansi_warnings ON
+Set quoted_identifier ON
+
+If @InternalWhere<>''
+   Set @InternalWhere=' Where '+@InternalWhere
+If @Where<>''
+   Set @Where=' Where '+@Where
+
+-- Fixed ORDER BY to avoid conversion errors
+If @Order<>''
+   Set @Order=' Order By '+@Order
+else
+   Set @Order=' Order By CASE WHEN ISNUMERIC(TafCode)=1 THEN convert(numeric, TafCode) ELSE 999999 END'
+
+Declare
+   @WhType VarChar(20),
+   @SqlTxt VarCHar(4000),
+   @Sta_TafType1 SmallInt,
+   @SiAccCodeBook Numeric,
+	@AccAllDocs smallint
+
+select @AccAllDocs = dbo.Tss_StdFindSystemParamValue('AccAllDocs')
+
+SELECT 
+	SiAccFinancePeriodToPlace
+Into #TempTable
+FROM         
+	dbo.Tss_AccFinancePeriodToPlace
+Where
+	(SiPubSubLocations in (select * from dbo.Tss_StdStringSiFindUdf(@SiPubSubLocations)))
+
+SELECT     
+   @Sta_TafType1=Sta_TafType1, 
+   @SiAccCodeBook=SiAccCodeBook
+FROM
+   dbo.Tss_AccCodeBook cBook
+WHERE
+   (Cod_AccountCode = @Cod_AccountCode)
+
+Set @WhType=''
+If @Sta_Start=0
+   SELECT @WhType=convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 0)
+If @Sta_End=0
+   If @WhType=''
+      SELECT @WhType=convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 1)
+   Else
+      SELECT @WhType=@WhType+','+convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 1)
+If @Sta_Close=0
+   If @WhType=''
+      SELECT @WhType=convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup =3)
+   Else
+      SELECT @WhType=@WhType+','+convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 3)
+
+If @Sta_TafType1=1
+Begin
+   Set @SqlTxt=
+   '
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,
+      Acc_Bed,
+      Acc_Bes,
+		Des_VdetDesc, 
+		Dat_AccVoucherDetDate, 
+		Num_VdetAmount,
+      Case When Acc_Bed>Acc_Bes Then Acc_Bed-Acc_Bes Else 0 End As Rst_Bed,
+      Case When Acc_Bes>Acc_Bed Then Acc_Bes-Acc_Bed Else 0 End As Rst_Bes,
+		dbo.Tss_FindRelatedSaler(TafCode) as RelatedSaler,
+		Des_CodeDescription
+   From
+   (
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,
+      Sum(Num_VdetDebtAmount) Acc_Bed,
+      Sum(Num_VdetCreditAmount) Acc_Bes,
+		Des_VdetDesc, 
+		Dat_AccVoucherDetDate, 
+		Num_VdetAmount,
+		Des_CodeDescription
+   From
+   (
+      SELECT     
+         dbo.Tss_PubPersonsViw.Cod_PubPersonCode TafCode, 
+         dbo.Tss_PubPersonsViw.Des_FullName TafDesc,
+         dbo.Tss_PubPersonsViw.SiPubPersonsSpec as SiTaf,
+         vDet.Num_VdetDebtAmount, 
+         vDet.Num_VdetCreditAmount,
+			'''' Des_VdetDesc,
+			'''' Dat_AccVoucherDetDate,
+			$0.0 Num_VdetAmount,
+			dbo.Tss_PubPersonsViw.Des_CodeDescription
+      FROM         
+         dbo.Tss_AccVoucher_Dt vDet INNER JOIN dbo.Tss_AccVoucher_Hd vHed 
+         ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd INNER JOIN
+         dbo.Tss_PubPersonsViw ON vDet.SiPubPersonsSpec1 = dbo.Tss_PubPersonsViw.SiPubPersonsSpec
+      WHERE '
+	if @AccAllDocs=0
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3)  AND (vHed.Sta_VochStatus <> 5)  AND 
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+         (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
+	else
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3)  AND --(vHed.Sta_VochStatus <> 5)  AND 
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+         (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
+
+   If @WhType<>''
+      Set @SqlTxt=@SqlTxt+' AND (vHed.SiAccVoucherType Not In ('+@WhType+'))'
+   Set @SqlTxt=@SqlTxt+' ) Ddd '
+   Set @SqlTxt=@SqlTxt+' Group By TafCode, TafDesc, SiTaf, Des_VdetDesc, Dat_AccVoucherDetDate, Num_VdetAmount, Des_CodeDescription ) Dd2 '
+End
+
+
+If @Sta_TafType1=2
+Begin
+   Set @SqlTxt=
+   '
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,
+      Acc_Bed,
+      Acc_Bes,
+		Des_VdetDesc, 
+		Dat_AccVoucherDetDate, 
+		Num_VdetAmount,
+      Case When Acc_Bed>Acc_Bes Then Acc_Bed-Acc_Bes Else 0 End As Rst_Bed,
+      Case When Acc_Bes>Acc_Bed Then Acc_Bes-Acc_Bed Else 0 End As Rst_Bes,
+		dbo.Tss_FindRelatedSaler(TafCode) as RelatedSaler,
+		Des_CodeDescription
+   From
+   (
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,
+      Sum(Num_VdetDebtAmount) Acc_Bed,
+      Sum(Num_VdetCreditAmount) Acc_Bes,
+		Des_VdetDesc, 
+		Dat_AccVoucherDetDate, 
+		Num_VdetAmount,
+		Des_CodeDescription
+   From
+   (
+      SELECT     
+         dbo.Tss_PubCostCenter.Cod_CostCenterCode TafCode,  
+         dbo.Tss_PubCostCenter.Des_CostCenterName TafDesc,
+         dbo.Tss_PubCostCenter.SiPubCostCenter as SiTaf,
+         vDet.Num_VdetDebtAmount, 
+         vDet.Num_VdetCreditAmount,
+			'''' Des_VdetDesc,
+			'''' Dat_AccVoucherDetDate,
+			$0.0 Num_VdetAmount,
+			dbo.Tss_PubCostCenter.Des_CodeDescription
+      FROM   
+         dbo.Tss_AccVoucher_Dt vDet INNER JOIN dbo.Tss_AccVoucher_Hd vHed 
+         ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd INNER JOIN
+         dbo.Tss_PubCostCenter ON vDet.SiPubCostCenter1 = dbo.Tss_PubCostCenter.SiPubCostCenter
+      WHERE '
+	if @AccAllDocs=0
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3)  AND (vHed.Sta_VochStatus <> 5)  AND  
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+	      (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
+	else
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3)  AND --(vHed.Sta_VochStatus <> 5)  AND  
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+	      (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
+
+If @WhType<>''
+      Set @SqlTxt=@SqlTxt+' AND (vHed.SiAccVoucherType Not In ('+@WhType+'))'
+   Set @SqlTxt=@SqlTxt+' ) Ddd
+   Group By TafCode, TafDesc, SiTaf, Des_VdetDesc, Dat_AccVoucherDetDate, Num_VdetAmount, Des_CodeDescription ) Dd2'
+End
+
+If @Sta_TafType1=3
+Begin
+   Set @SqlTxt=
+   '
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,
+      Acc_Bed,
+      Acc_Bes,
+      Case When Acc_Bed>Acc_Bes Then Acc_Bed-Acc_Bes Else 0 End As Rst_Bed,
+      Case When Acc_Bes>Acc_Bed Then Acc_Bes-Acc_Bed Else 0 End As Rst_Bes,
+		dbo.Tss_FindRelatedSaler(TafCode) as RelatedSaler,
+		'''' as Des_CodeDescription
+   From
+   (
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,
+      Sum(Num_VdetDebtAmount) Acc_Bed,
+      Sum(Num_VdetCreditAmount) Acc_Bes
+   From
+   (
+      SELECT     
+         dbo.Tss_PubProjects.Cod_ProjectsCode TafCode,  
+         dbo.Tss_PubProjects.Des_ProjectsThemeDesc TafDesc,
+         dbo.Tss_PubProjects.SiPubProjects as SiTaf,
+         vDet.Num_VdetDebtAmount, 
+         vDet.Num_VdetCreditAmount 
+      FROM         
+         dbo.Tss_AccVoucher_Dt vDet INNER JOIN dbo.Tss_AccVoucher_Hd vHed 
+         ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd INNER JOIN
+         dbo.Tss_PubProjects ON vDet.SiPubProjects1 = dbo.Tss_PubProjects.SiPubProjects
+      WHERE '
+	if @AccAllDocs=0
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3) AND (vHed.Sta_VochStatus <> 5)  AND  
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+         (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
+	else
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3) AND --(vHed.Sta_VochStatus <> 5)  AND  
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+         (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
+
+   If @WhType<>''
+      Set @SqlTxt=@SqlTxt+' AND (vHed.SiAccVoucherType Not In ('+@WhType+'))'
+   Set @SqlTxt=@SqlTxt+' ) Ddd
+   Group By TafCode, TafDesc, SiTaf ) Dd2'
+End
+
+If @Sta_TafType1=4
+Begin
+   Set @SqlTxt=
+   '
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,
+      Acc_Bed,
+      Acc_Bes,
+      Case When Acc_Bed>Acc_Bes Then Acc_Bed-Acc_Bes Else 0 End As Rst_Bed,
+      Case When Acc_Bes>Acc_Bed Then Acc_Bes-Acc_Bed Else 0 End As Rst_Bes,
+		dbo.Tss_FindRelatedSaler(TafCode) as RelatedSaler,
+		'''' Des_CodeDescription
+   From
+   (
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,
+      Sum(Num_VdetDebtAmount) Acc_Bed,
+      Sum(Num_VdetCreditAmount) Acc_Bes
+   From
+   (
+      SELECT     
+         dbo.Tss_PurOrder_Hd.Cod_PurOrderCode TafCode,  
+         dbo.Tss_PurOrder_Hd.Des_PurOrderDesc TafDesc,
+         dbo.Tss_PurOrder_Hd.SiPurOrder_Hd as SiTaf,
+         vDet.Num_VdetDebtAmount, 
+         vDet.Num_VdetCreditAmount 
+      FROM         
+         dbo.Tss_AccVoucher_Dt vDet INNER JOIN dbo.Tss_AccVoucher_Hd vHed 
+         ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd INNER JOIN
+         dbo.Tss_PurOrder_Hd ON vDet.SiPurOrder_Hd1 = dbo.Tss_PurOrder_Hd.SiPurOrder_Hd
+      WHERE '
+	if @AccAllDocs=0
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3)  AND (vHed.Sta_VochStatus <> 5)  AND  
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+         (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
+	else
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3)  AND --(vHed.Sta_VochStatus <> 5)  AND  
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+         (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
+
+   If @WhType<>''
+      Set @SqlTxt=@SqlTxt+' AND (vHed.SiAccVoucherType Not In ('+@WhType+'))'
+   Set @SqlTxt=@SqlTxt+' ) Ddd
+   Group By TafCode, TafDesc, SiTaf ) Dd2'
+End
+
+-- If @Sta_TafType1=0, return NULL for SiTaf
+If @Sta_TafType1=0
+Begin
+   Set @SqlTxt=
+   '
+   Select 
+      '''' TafCode,
+      '''' TafDesc,
+      NULL as SiTaf,
+      convert(numeric,0) Acc_Bed,
+      convert(numeric,0) Acc_Bes,
+      convert(numeric,0) Rst_Bed,
+      convert(numeric,0) Rst_Bes,
+      '''' Des_VdetDesc,
+      '''' Dat_AccVoucherDetDate,
+      convert(numeric,0) Num_VdetAmount,
+      '''' RelatedSaler,
+      '''' Des_CodeDescription
+   '
+End
+
+print @SqlTxt
+
+If @Sta_TafType1<>0
+Exec(
+'Select * From
+(
+   Select * From
+   ( '+@SqlTxt+
+   ' ) Ccc  '+@InternalWhere+'
+) CalcSel ' + @Where + @Order)
+Else
+Exec(@SqlTxt)
+
+GO
