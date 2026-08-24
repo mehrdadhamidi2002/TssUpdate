@@ -5033,3 +5033,270 @@ Else
 Exec(@SqlTxt)
 
 GO
+
+alter PROCEDURE Tss_AccUntTafsiliReview_03VStp   
+(  
+    @InternalWhere VARCHAR(8000)='', 
+    @Where VARCHAR(8000)='', 
+    @Order VARCHAR(8000)='', 
+    @DsFromDate VARCHAR(10)='1399/01/01', 
+    @DsToDate VARCHAR(10)='1399/09/07', 
+    @SiAccFinancePeriod NUMERIC=20, 
+    @SiPubSubLocations VARCHAR(500)='1,2', 
+    @Sta_Start SMALLINT=0,
+    @Sta_End SMALLINT=0, 
+    @Sta_Close SMALLINT=0, 
+    @StaMandehOrNot SMALLINT=1, 
+    @SiAccCodeBook VARCHAR(50)='18,21', 
+    @SiSelected VARCHAR(50)='2160',
+    @SiUser NUMERIC=1
+)
+AS
+BEGIN
+    SET NOCOUNT ON
+    SET XACT_ABORT, ARITHABORT, CONCAT_NULL_YIELDS_NULL, ANSI_NULLS, ANSI_NULL_DFLT_ON, ANSI_PADDING, ANSI_WARNINGS, QUOTED_IDENTIFIER ON
+
+    -- Drop temp tables if exist
+    DROP TABLE IF EXISTS ##TmpVchTaf
+    DROP TABLE IF EXISTS ##TmpVchTafMandeh
+    DROP TABLE IF EXISTS ##TmpVchTafBaBiMandeh
+    DROP TABLE IF EXISTS #TempTable
+
+    -- Set conditions - handle NULL parameters
+    SET @InternalWhere = CASE WHEN @InternalWhere IS NOT NULL AND @InternalWhere<>'' THEN ' WHERE '+@InternalWhere ELSE '' END
+    SET @Where = CASE WHEN @Where IS NOT NULL AND @Where<>'' THEN ' WHERE '+@Where ELSE '' END
+    SET @Order = CASE WHEN @Order IS NOT NULL AND @Order<>'' THEN ' ORDER BY '+@Order ELSE '' END
+
+    DECLARE @WhType VARCHAR(300)=CASE 
+        WHEN @Sta_Start=0 THEN (SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=0) ELSE '' END
+        
+    SET @WhType = @WhType + CASE WHEN @Sta_End=0 AND @WhType<>'' THEN ',' ELSE '' END + 
+        CASE WHEN @Sta_End=0 THEN (SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=1) ELSE '' END
+        
+    SET @WhType = @WhType + CASE WHEN @Sta_Close=0 AND @WhType<>'' THEN ',' ELSE '' END + 
+        CASE WHEN @Sta_Close=0 THEN (SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=3) ELSE '' END
+        
+    SET @WhType = CASE WHEN @WhType<>'' THEN ' AND vHed.SiAccVoucherType NOT IN ('+@WhType+')' ELSE '' END
+
+    -- Get TafName
+    DECLARE @TafName VARCHAR(100)=CASE (SELECT TOP 1 Sta_TafType1 FROM Tss_AccCodeBook WHERE SiAccCodeBook=(SELECT TOP 1 SiSel FROM dbo.Tss_StdStringSiFindUdf(@SiAccCodeBook)))
+        WHEN 1 THEN 'SiPubPersonsSpec1' WHEN 2 THEN 'SiPubCostCenter1' WHEN 3 THEN 'SiPubProjects1' WHEN 4 THEN 'SiPurOrder_Hd1' END
+
+    DECLARE @AccAllDocs SMALLINT = dbo.Tss_StdFindSystemParamValue('AccAllDocs')
+    
+    -- AccStar hidden filter
+    DECLARE @HiddenFilter VARCHAR(500)
+    IF dbo.Tss_StdFindIfUserIsInGroup(@SiUser,'AccStar') = 1
+        SET @HiddenFilter = ''
+    ELSE
+        SET @HiddenFilter = ' AND (vDet.Sta_IsHidden = 0 OR vDet.Sta_IsHidden IS NULL) '
+    
+    -- Build temp table for period
+    SELECT SiAccFinancePeriodToPlace INTO #TempTable FROM dbo.Tss_AccFinancePeriodToPlace
+    WHERE SiPubSubLocations IN (SELECT * FROM dbo.Tss_StdStringSiFindUdf(@SiPubSubLocations))
+
+    -- Create ##TmpVchTaf explicitly with NVARCHAR(4000) for Des_VdetDesc
+    CREATE TABLE ##TmpVchTaf (
+        SiAccVoucher_Hd NUMERIC NULL,
+        Dat_VhedDate VARCHAR(10) NULL,
+        Num_VDetRow INT NULL,
+        Des_VdetDesc NVARCHAR(4000) NULL,  -- Changed to NVARCHAR(4000)
+        Num_VdetDebtAmount BIGINT NULL,
+        Num_VdetCreditAmount BIGINT NULL,
+        Num_VhedFinalNo DECIMAL(18,0) NULL,
+        Num_VhedSubNo INT NULL
+    )
+
+    -- Build main query with CAST for Des_VdetDesc
+    DECLARE @StatusFilter VARCHAR(100)=CASE WHEN @AccAllDocs=0 THEN 'vHed.Sta_VochStatus >= 3 AND vHed.Sta_VochStatus <> 5 AND ' ELSE 'vHed.Sta_VochStatus >= 3 AND ' END
+    
+    DECLARE @SqlTxt NVARCHAR(MAX)='
+    SELECT 
+        vHed.SiAccVoucher_Hd, 
+        vHed.Dat_VhedDate, 
+        vDet.Num_VDetRow,
+        Des_VdetDesc = CAST(CASE WHEN Tss_AccVoucherType.Sta_VoucherTypeGroup IN (4,5) 
+            THEN ISNULL(vDet.Des_VdetDesc,'''') 
+            ELSE vDet.Des_VdetDesc 
+        END AS NVARCHAR(4000)),  -- Cast to NVARCHAR(4000)
+        CAST(vDet.Num_VdetDebtAmount AS BIGINT) AS Num_VdetDebtAmount, 
+        CAST(vDet.Num_VdetCreditAmount AS BIGINT) AS Num_VdetCreditAmount, 
+        CAST(vHed.Num_VhedFinalNo AS DECIMAL(18,0)) AS Num_VhedFinalNo, 
+        CAST(vHed.Num_VhedSubNo AS INT) AS Num_VhedSubNo
+    FROM Tss_AccCodeBook cBook
+    INNER JOIN Tss_AccVoucher_Dt vDet ON cBook.SiAccCodeBook = vDet.SiAccCodeBook
+    INNER JOIN Tss_AccVoucher_Hd vHed ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd
+    INNER JOIN Tss_AccVoucherType ON vHed.SiAccVoucherType = Tss_AccVoucherType.SiAccVoucherType
+    WHERE ' + @StatusFilter + '
+        vHed.SiAccFinancePeriodToPlace IN (SELECT SiAccFinancePeriodToPlace FROM #TempTable)
+        AND vHed.Dat_VhedDate BETWEEN ''' + @DsFromDate + ''' AND ''' + @DsToDate + '''
+        AND cBook.SiAccCodeBook IN (SELECT SiSel FROM dbo.Tss_StdStringSiFindUdf(''' + @SiAccCodeBook + '''))
+        AND vDet.' + @TafName + ' = ' + @SiSelected + '
+        ' + @HiddenFilter + '
+        ' + @WhType
+
+    -- Insert into ##TmpVchTaf
+    DECLARE @InsertSql NVARCHAR(MAX) = '
+    INSERT INTO ##TmpVchTaf
+    SELECT * FROM (' + @SqlTxt + ') AS Ccc 
+    ' + @InternalWhere + '
+    ' + @Where + ' 
+    ' + @Order
+
+    BEGIN TRY
+        EXEC sp_executesql @InsertSql
+    END TRY
+    BEGIN CATCH
+        PRINT 'Error inserting into ##TmpVchTaf: ' + ERROR_MESSAGE()
+    END CATCH
+
+    -- Create ##TmpVchTafMandeh explicitly
+    CREATE TABLE ##TmpVchTafMandeh (
+        Num_VdetDebtAmount BIGINT NULL,
+        Num_VdetCreditAmount BIGINT NULL
+    )
+
+    -- Build mandate query
+    DECLARE @SqlTxtMandeh NVARCHAR(MAX)='
+    SELECT 
+        CAST(SUM(vDet.Num_VdetDebtAmount) AS BIGINT) AS Num_VdetDebtAmount, 
+        CAST(SUM(vDet.Num_VdetCreditAmount) AS BIGINT) AS Num_VdetCreditAmount
+    FROM Tss_AccCodeBook cBook
+    INNER JOIN Tss_AccVoucher_Dt vDet ON cBook.SiAccCodeBook = vDet.SiAccCodeBook
+    INNER JOIN Tss_AccVoucher_Hd vHed ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd
+    WHERE ' + @StatusFilter + '
+        vHed.SiAccFinancePeriodToPlace IN (SELECT SiAccFinancePeriodToPlace FROM #TempTable)
+        AND vHed.Dat_VhedDate BETWEEN ''1385/01/01'' AND ''' + dbo.Tss_StdOneDayDecUdf(@DsFromDate) + '''
+        AND cBook.SiAccCodeBook IN (SELECT SiSel FROM dbo.Tss_StdStringSiFindUdf(''' + @SiAccCodeBook + '''))
+        AND vDet.' + @TafName + ' = ' + @SiSelected + '
+        ' + @HiddenFilter + '
+        ' + @WhType + '
+    GROUP BY vDet.SiPubPersonsSpec1'
+
+    -- Insert into ##TmpVchTafMandeh
+    DECLARE @InsertMandehSql NVARCHAR(MAX) = '
+    INSERT INTO ##TmpVchTafMandeh
+    SELECT * FROM (' + @SqlTxtMandeh + ') AS Ccc'
+
+    BEGIN TRY
+        EXEC sp_executesql @InsertMandehSql
+    END TRY
+    BEGIN CATCH
+        PRINT 'Error inserting into ##TmpVchTafMandeh: ' + ERROR_MESSAGE()
+    END CATCH
+
+    -- Create ##TmpVchTafBaBiMandeh explicitly with NVARCHAR(4000) for Des_VdetDesc
+    CREATE TABLE ##TmpVchTafBaBiMandeh (
+        SiAccVoucher_Hd NUMERIC NULL,
+        Dat_VhedDate VARCHAR(10) NULL,
+        Num_VDetRow INT NULL,
+        Des_VdetDesc NVARCHAR(4000) NULL,  -- Changed to NVARCHAR(4000)
+        Num_VdetDebtAmount BIGINT NULL,
+        Num_VdetCreditAmount BIGINT NULL,
+        Num_VhedFinalNo DECIMAL(18,0) NULL,
+        Num_VhedSubNo INT NULL
+    )
+
+    -- Combine results with CAST for Des_VdetDesc
+    DECLARE @SqlTxtBaBiMandeh NVARCHAR(MAX)
+    IF @StaMandehOrNot = 1
+    BEGIN
+        SET @SqlTxtBaBiMandeh = '
+        SELECT 
+            0 AS SiAccVoucher_Hd, 
+            '''' AS Dat_VhedDate, 
+            0 AS Num_VDetRow, 
+            CAST(''مانده از قبل'' AS NVARCHAR(4000)) AS Des_VdetDesc,  -- Cast here
+            CAST(ISNULL(Num_VdetDebtAmount, 0) AS BIGINT) AS Num_VdetDebtAmount, 
+            CAST(ISNULL(Num_VdetCreditAmount, 0) AS BIGINT) AS Num_VdetCreditAmount, 
+            CAST(0 AS DECIMAL(18,0)) AS Num_VhedFinalNo, 
+            CAST(0 AS INT) AS Num_VhedSubNo
+        FROM ##TmpVchTafMandeh
+        UNION ALL
+        SELECT 
+            SiAccVoucher_Hd, 
+            Dat_VhedDate, 
+            Num_VDetRow, 
+            CAST(Des_VdetDesc AS NVARCHAR(4000)) AS Des_VdetDesc,  -- Cast here
+            Num_VdetDebtAmount, 
+            Num_VdetCreditAmount, 
+            Num_VhedFinalNo, 
+            Num_VhedSubNo
+        FROM ##TmpVchTaf'
+    END
+    ELSE
+    BEGIN
+        SET @SqlTxtBaBiMandeh = '
+        SELECT 
+            SiAccVoucher_Hd, 
+            Dat_VhedDate, 
+            Num_VDetRow, 
+            CAST(Des_VdetDesc AS NVARCHAR(4000)) AS Des_VdetDesc,  -- Cast here
+            Num_VdetDebtAmount, 
+            Num_VdetCreditAmount, 
+            Num_VhedFinalNo, 
+            Num_VhedSubNo
+        FROM ##TmpVchTaf'
+    END
+
+    -- Insert into ##TmpVchTafBaBiMandeh
+    DECLARE @InsertCombineSql NVARCHAR(MAX) = '
+    INSERT INTO ##TmpVchTafBaBiMandeh
+    SELECT * FROM (' + @SqlTxtBaBiMandeh + ') AS Ccc 
+    ' + @InternalWhere + '
+    ' + @Where + ' 
+    ' + @Order
+
+    BEGIN TRY
+        EXEC sp_executesql @InsertCombineSql
+    END TRY
+    BEGIN CATCH
+        PRINT 'Error inserting into ##TmpVchTafBaBiMandeh: ' + ERROR_MESSAGE()
+    END CATCH
+
+    -- Final calculation - Cast MyId to DECIMAL for BCD
+    ;WITH FinalData AS (
+        SELECT 
+            CAST(ROW_NUMBER() OVER (ORDER BY Dat_VhedDate, SiAccVoucher_Hd, Num_VDetRow) AS DECIMAL(18,0)) AS MyId,
+            SiAccVoucher_Hd, 
+            CAST(Num_VhedFinalNo AS DECIMAL(18,0)) AS Num_VhedFinalNo,
+            CAST(Num_VhedSubNo AS INT) AS Num_VhedSubNo,
+            Dat_VhedDate, 
+            LEFT(Dat_VhedDate, 7) AS Dat_VhedDateMonth,
+            Num_VDetRow,
+            Des_VdetDesc,
+            CAST(Num_VdetDebtAmount AS BIGINT) AS Num_VdetDebtAmount,
+            CAST(Num_VdetCreditAmount AS BIGINT) AS Num_VdetCreditAmount,
+            CAST(Num_VdetDebtAmount - Num_VdetCreditAmount AS BIGINT) AS Acc_Rest
+        FROM ##TmpVchTafBaBiMandeh
+    ),
+    RunningSum AS (
+        SELECT 
+            *,
+            SUM(Acc_Rest) OVER (ORDER BY MyId) AS Acc_Rest_Sum
+        FROM FinalData
+    )
+    SELECT 
+        MyId,
+        SiAccVoucher_Hd,
+        Num_VhedFinalNo,
+        Num_VhedSubNo,
+        Dat_VhedDate,
+        Dat_VhedDateMonth,
+        Num_VDetRow,
+        Des_VdetDesc,
+        Num_VdetDebtAmount,
+        Num_VdetCreditAmount,
+        Acc_Rest,
+        Acc_Rest_Sum
+    FROM RunningSum
+    ORDER BY Dat_VhedDate, SiAccVoucher_Hd, Num_VDetRow
+
+    -- Cleanup
+    DROP TABLE IF EXISTS #TempTable
+    DROP TABLE IF EXISTS ##TmpVchTaf
+    DROP TABLE IF EXISTS ##TmpVchTafMandeh
+    DROP TABLE IF EXISTS ##TmpVchTafBaBiMandeh
+END
+
+GO
