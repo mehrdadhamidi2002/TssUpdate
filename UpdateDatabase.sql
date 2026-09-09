@@ -1,4 +1,98 @@
-﻿-- Create version tracking table if it doesn't exist
+﻿-- First, check if the columns exist in the table
+SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_NAME = 'Tss_LonLoans'
+AND COLUMN_NAME IN (
+    'Num_BreathDays',
+    'Num_ProfInBreathDate',
+    'Num_PorfInInstallments',
+    'SiPubCustomCodes',
+    'SiPubPersonsSpec',
+    'Sta_LoanType',
+    'DateLoanStartDate'
+);
+
+-- If any columns are missing, add them using this script
+-- Add Num_BreathDays if missing
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
+               WHERE TABLE_NAME = 'Tss_LonLoans' 
+               AND COLUMN_NAME = 'Num_BreathDays')
+BEGIN
+    ALTER TABLE [dbo].[Tss_LonLoans] 
+    ADD [Num_BreathDays] [smallint] NULL;
+END
+GO
+
+-- Add Num_ProfInBreathDate if missing
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
+               WHERE TABLE_NAME = 'Tss_LonLoans' 
+               AND COLUMN_NAME = 'Num_ProfInBreathDate')
+BEGIN
+    ALTER TABLE [dbo].[Tss_LonLoans] 
+    ADD [Num_ProfInBreathDate] [numeric](18, 0) NULL;
+END
+GO
+
+-- Add Num_PorfInInstallments if missing
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
+               WHERE TABLE_NAME = 'Tss_LonLoans' 
+               AND COLUMN_NAME = 'Num_PorfInInstallments')
+BEGIN
+    ALTER TABLE [dbo].[Tss_LonLoans] 
+    ADD [Num_PorfInInstallments] [numeric](18, 0) NULL;
+END
+GO
+
+-- Add SiPubCustomCodes if missing
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
+               WHERE TABLE_NAME = 'Tss_LonLoans' 
+               AND COLUMN_NAME = 'SiPubCustomCodes')
+BEGIN
+    ALTER TABLE [dbo].[Tss_LonLoans] 
+    ADD [SiPubCustomCodes] [numeric](18, 0) NULL;
+END
+GO
+
+-- Add SiPubPersonsSpec if missing
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
+               WHERE TABLE_NAME = 'Tss_LonLoans' 
+               AND COLUMN_NAME = 'SiPubPersonsSpec')
+BEGIN
+    ALTER TABLE [dbo].[Tss_LonLoans] 
+    ADD [SiPubPersonsSpec] [numeric](18, 0) NULL;
+END
+GO
+
+-- Add Sta_LoanType if missing
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
+               WHERE TABLE_NAME = 'Tss_LonLoans' 
+               AND COLUMN_NAME = 'Sta_LoanType')
+BEGIN
+    ALTER TABLE [dbo].[Tss_LonLoans] 
+    ADD [Sta_LoanType] [smallint] NULL;
+END
+GO
+
+-- Add DateLoanStartDate if missing
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
+               WHERE TABLE_NAME = 'Tss_LonLoans' 
+               AND COLUMN_NAME = 'DateLoanStartDate')
+BEGIN
+    ALTER TABLE [dbo].[Tss_LonLoans] 
+    ADD [DateLoanStartDate] [varchar](10) NULL;
+END
+GO
+
+-- After adding columns, refresh the stored procedure to recognize the new columns
+-- You may need to execute sp_refreshsqlmodule or recreate the procedure
+EXEC sp_refreshsqlmodule 'Tss_LonUntLoansIudStp';
+GO
+
+-- If the procedure still has errors, you can try to recompile it
+EXEC sp_recompile 'Tss_LonUntLoansIudStp';
+GO
+
+-- Create version tracking table if it doesn't exist
 IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[DBVersion]') AND type in (N'U'))
 BEGIN
     CREATE TABLE DBVersion (
@@ -2304,9 +2398,6 @@ Begin
 End
 
 go
-
-USE [TssEmpty]
-GO
 
 SET ANSI_NULLS ON
 GO
