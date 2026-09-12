@@ -6073,3 +6073,466 @@ ELSE
 Exec(@FinalSql)
 
 GO
+
+alter Procedure Tss_EmpUntLeaveDocsIudStp
+(
+	@Err_Code Int=0 OutPut,
+	@SiEmpLeaveDocs Numeric=0 OutPut,
+	@SiEmpLeaveTypes numeric=6,
+	@SiPubPersonsSpec varchar(8000)='1217',
+	@Cod_LeaveDocNumber varchar(50)='10702',
+	@Dat_LeaveStartDate varchar(10)='1390/07/01',
+	@Dat_LevaEndedDate varchar(10)='1390/07/05',
+	@Dat_LeaveRequstDate varchar(10)='1390/07/01',
+	@Sta_LeaveDocAcceptStat smallint=1,
+	@Sta_LeaveDocRegStat smallint=1,
+	@Num_LeaveStartTime int=0,
+	@Num_LeaveEndedTime int=0,
+	@DesWorkStart varchar(500)='',
+	@DesWorkEnd varchar(500)='',
+	@StmEmpLeaveDocs TimeStamp=0,
+	@SiUser Numeric=1,
+	@FlgInsUpdDel SmallInt=1
+) As
+-------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------
+
+If @FlgInsUpdDel=0
+Begin
+declare 
+	@PerTable table (SiPer numeric)
+declare 
+	@SiSelected numeric
+Insert Into @PerTable
+(SiPer)
+select distinct SiSel from dbo.Tss_StdStringSiFindUdf(@SiPubPersonsSpec) order by SiSel
+	while exists(select SiPer from @PerTable)
+	Begin
+		Select top 1 @SiSelected=SiPer from @PerTable order by SiPer
+
+		-------------------------------------------------------------------------------------------------
+		-- NEW: if a record already exists for this person with the same
+		-- SiEmpLeaveTypes, SiPubPersonsSpec (=@SiSelected), Dat_LeaveStartDate,
+		-- Dat_LevaEndedDate, Dat_LeaveRequstDate, Num_LeaveStartTime and
+		-- Num_LeaveEndedTime, skip inserting a duplicate for this person and
+		-- move on to the next one in @PerTable.
+		-------------------------------------------------------------------------------------------------
+		if exists
+		(
+			select 1
+			from dbo.Tss_EmpLeaveDocs
+			where	SiEmpLeaveTypes		= @SiEmpLeaveTypes
+				and	SiPubPersonsSpec	= @SiSelected
+				and	Dat_LeaveStartDate	= @Dat_LeaveStartDate
+				and	Dat_LevaEndedDate	= @Dat_LevaEndedDate
+				and	Dat_LeaveRequstDate	= @Dat_LeaveRequstDate
+				and	Num_LeaveStartTime	= @Num_LeaveStartTime
+				and	Num_LeaveEndedTime	= @Num_LeaveEndedTime
+		)
+		Begin
+			Delete From @PerTable where SiPer=@SiSelected
+			Continue
+		End
+		-------------------------------------------------------------------------------------------------
+
+--		select @Cod_LeaveDocNumber=isnull(Max(Convert(Int,Cod_LeaveDocNumber)),0)+1 from dbo.Tss_EmpLeaveDocs
+
+		if exists(select 1 from dbo.Tss_EmpLeaveDocs)
+			select @Cod_LeaveDocNumber=isnull(Max(Convert(Int,Cod_LeaveDocNumber)),0)+1 from dbo.Tss_EmpLeaveDocs
+		Else
+			Set @Cod_LeaveDocNumber=1
+
+			Insert Into dbo.Tss_EmpLeaveDocs
+			(
+				SiEmpLeaveTypes,
+				SiPubPersonsSpec,
+				Cod_LeaveDocNumber,
+				Dat_LeaveStartDate,
+				Dat_LevaEndedDate,
+				Dat_LeaveRequstDate,
+				Sta_LeaveDocAcceptStat,
+				Sta_LeaveDocRegStat,
+				Num_LeaveStartTime,
+				Num_LeaveEndedTime
+			)
+			Values
+			(
+				@SiEmpLeaveTypes,
+				@SiSelected,
+				@Cod_LeaveDocNumber,
+				@Dat_LeaveStartDate,
+				@Dat_LevaEndedDate,
+				@Dat_LeaveRequstDate,
+				@Sta_LeaveDocAcceptStat,
+				@Sta_LeaveDocRegStat,
+				@Num_LeaveStartTime,
+				@Num_LeaveEndedTime
+			)
+			Set @SiEmpLeaveDocs=Scope_Identity()
+---------------------------------------------------------------------------------------------------------------------------------------
+		if Exists
+		(
+		SELECT     
+			Tss_EmpLeaveTypes.SiEmpLeaveTypes
+		FROM         
+			Tss_EmpLeaveTypes
+		WHERE     
+			(Tss_EmpLeaveTypes.Sta_LeaveTypeWorkCalc = 0) and (Tss_EmpLeaveTypes.SiEmpLeaveTypes=@SiEmpLeaveTypes)
+		)
+		Begin
+			Declare @SiGenDates numeric
+			Declare mm cursor for 
+			SELECT     
+				SiGenDates
+			FROM         
+				Tss_GenDates
+			WHERE     
+				(Dat_GenShamsiDate between @Dat_LeaveStartDate and @Dat_LevaEndedDate)
+			open mm
+
+			Fetch next from mm into @SiGenDates
+			
+			while @@Fetch_status=0 
+			Begin
+				UPDATE    
+					Tss_EmpWorkDailyCalc
+				SET              
+					Sta_IsEstelaji = 1
+				WHERE     
+					(SiGenDates = @SiGenDates) and
+					(SiPubPersonsSpec = @SiSelected)
+				Fetch next from mm into @SiGenDates
+			End
+			Close mm
+			Deallocate mm
+		End
+		Else
+		Begin
+			Declare nn cursor for 
+			SELECT     
+				SiGenDates
+			FROM         
+				Tss_GenDates
+			WHERE     
+				(Dat_GenShamsiDate between @Dat_LeaveStartDate and @Dat_LevaEndedDate)
+
+			open nn
+
+			Fetch next from nn into @SiGenDates
+			
+			while @@Fetch_status=0 
+			Begin
+				UPDATE    
+					Tss_EmpWorkDailyCalc
+				SET              
+					Sta_IsEstelaji = 0
+				WHERE     
+					(SiGenDates = @SiGenDates) and
+					(SiPubPersonsSpec = @SiSelected)
+				Fetch next from nn into @SiGenDates
+			End
+			Close nn
+			Deallocate nn
+		End
+---------------------------------------------------------------------------------------------------------------------------------------
+		------------------------------------------------درج در محاسبه مرخصي------------------------------------------------------
+			Declare 
+				@SiGenDate numeric,
+				@LeaveDate VarChar(10),
+				@NumEndOfDay Numeric, 
+				@NumStartOfDay Numeric,
+				@Sta_WorkDayState SmallInt,
+				@LeaveAmt numeric,
+				@SiEmpWorkGroups numeric
+
+			set @LeaveAmt=0			
+
+			Declare LeaveDates Cursor For
+				SELECT SiGenDates,Dat_GenShamsiDate FROM Tss_GenDates 
+				WHERE (Dat_GenShamsiDate BETWEEN @Dat_LeaveStartDate AND @Dat_LevaEndedDate)
+				Order By Dat_GenShamsiDate
+
+			Open LeaveDates
+
+			Fetch Next From LeaveDates	into 
+				@SiGenDate,
+				@LeaveDate
+
+				print 'من اينجاممممممممممممممممم'
+			
+			While @@Fetch_Status=0
+			Begin
+				select @SiEmpWorkGroups = dbo.Tss_EmpFindWorkGroupSi_Udf(@LeaveDate,convert(numeric,@SiSelected))
+				SELECT @Sta_WorkDayState=Sta_WorkDayState FROM Tss_EmpWorkTime	WHERE (SiGenDates = @SiGenDate) AND (SiEmpWorkGroups = @SiEmpWorkGroups)
+				Select @LeaveAmt = dbo.Tss_EmpFindLeaveAmt(@SiEmpLeaveDocs , @SiSelected , @LeaveDate )
+				if isnull(@LeaveAmt,0)>0
+				Begin
+					if exists(SELECT SiEmpLeaveCalc FROM Tss_EmpLeaveCalc WHERE (SiEmpLeaveDocs  = @SiEmpLeaveDocs ) and (Dat_LeaveDate=@LeaveDate))
+					Begin
+						If (@Sta_WorkDayState = 0)
+						Update dbo.Tss_EmpLeaveCalc Set
+							SiEmpLeaveDocs=@SiEmpLeaveDocs, 
+							Dat_LeaveDate=@LeaveDate, 
+							Num_LeaveUsedMin=@LeaveAmt
+						Where Dat_LeaveDate=@LeaveDate And SiEmpLeaveDocs=@SiEmpLeaveDocs
+						else
+						Update dbo.Tss_EmpLeaveCalc Set
+							SiEmpLeaveDocs=@SiEmpLeaveDocs, 
+							Dat_LeaveDate=@LeaveDate, 
+							Num_LeaveUsedMin=0
+						Where Dat_LeaveDate=@LeaveDate And SiEmpLeaveDocs=@SiEmpLeaveDocs
+					End
+					Else					
+					Insert Into dbo.Tss_EmpLeaveCalc
+						(SiEmpLeaveDocs,Dat_LeaveDate,Num_LeaveUsedMin) Values (@SiEmpLeaveDocs,@LeaveDate,@LeaveAmt)
+				End
+				Fetch Next From LeaveDates
+				Into @SiGenDate,@LeaveDate
+			End
+			Close LeaveDates
+			Deallocate LeaveDates
+		
+		------------------------------------------------درج در محاسبه مرخصي------------------------------------------------------
+			If IsNull(@SiEmpLeaveDocs,0)=0
+			Begin
+				Set @SiEmpLeaveDocs=0
+				Set @Err_Code=400
+			End
+			
+		Delete From @PerTable where SiPer=@SiSelected
+	End
+End
+-------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------
+If @FlgInsUpdDel=1
+Begin
+	Set @Err_Code=0
+	If Exists(
+	Select StmEmpLeaveDocs From dbo.Tss_EmpLeaveDocs
+	Where (SiEmpLeaveDocs=@SiEmpLeaveDocs)) -- And (StmEmpLeaveDocs=@StmEmpLeaveDocs))
+	Begin
+		Update dbo.Tss_EmpLeaveDocs Set
+			SiEmpLeaveTypes=@SiEmpLeaveTypes,
+			SiPubPersonsSpec=convert(numeric,@SiPubPersonsSpec),
+			Cod_LeaveDocNumber=@Cod_LeaveDocNumber,
+			Dat_LeaveStartDate=@Dat_LeaveStartDate,
+			Dat_LevaEndedDate=@Dat_LevaEndedDate,
+			Dat_LeaveRequstDate=@Dat_LeaveRequstDate,
+			Sta_LeaveDocAcceptStat=@Sta_LeaveDocAcceptStat,
+			Sta_LeaveDocRegStat=@Sta_LeaveDocRegStat,
+			Num_LeaveStartTime=@Num_LeaveStartTime,
+			Num_LeaveEndedTime=@Num_LeaveEndedTime
+		Where (SiEmpLeaveDocs=@SiEmpLeaveDocs)
+
+---------------------------------------------------------------------------------------------------------------------------------------
+/*		if Exists
+		(
+		SELECT     
+			Tss_EmpLeaveTypes.SiEmpLeaveTypes
+		FROM         
+			Tss_EmpLeaveTypes
+		WHERE     
+			(Tss_EmpLeaveTypes.Sta_LeaveTypeWorkCalc = 0) and (Tss_EmpLeaveTypes.SiEmpLeaveTypes=@SiEmpLeaveTypes)
+		)
+		Begin
+--print 'ok'
+			Declare mm cursor for 
+			SELECT     
+				SiGenDates
+			FROM         
+				Tss_GenDates
+			WHERE     
+				(Dat_GenShamsiDate between @Dat_LeaveStartDate and @Dat_LevaEndedDate)
+
+			open mm
+
+			Fetch next from mm into @SiGenDates
+			
+			while @@Fetch_status=0 
+			Begin
+				UPDATE    
+					Tss_EmpWorkDailyCalc
+				SET              
+					Sta_IsEstelaji = 1
+				WHERE     
+					(SiGenDates = @SiGenDates) and
+					(SiPubPersonsSpec = convert(numeric,@SiPubPersonsSpec))
+				Fetch next from mm into @SiGenDates
+			End
+			Close mm
+			Deallocate mm
+		End
+		Else
+		Begin
+print 'ok'
+			Declare nn cursor for 
+			SELECT     
+				SiGenDates
+			FROM         
+				Tss_GenDates
+			WHERE     
+				(Dat_GenShamsiDate between @Dat_LeaveStartDate and @Dat_LevaEndedDate)
+
+			open nn
+
+			Fetch next from nn into @SiGenDates
+			
+			while @@Fetch_status=0 
+			Begin
+				UPDATE    
+					Tss_EmpWorkDailyCalc
+				SET              
+					Sta_IsEstelaji = 0
+				WHERE     
+					(SiGenDates = @SiGenDates) and
+					(SiPubPersonsSpec = convert(numeric,@SiPubPersonsSpec))
+				Fetch next from nn into @SiGenDates
+			End
+			Close nn
+			Deallocate nn
+		End*/
+---------------------------------------------------------------------------------------------------------------------------------------
+		------------------------------------------------درج در محاسبه مرخصي------------------------------------------------------
+			set @LeaveAmt=0			
+
+			Declare LeaveDates Cursor For
+				SELECT SiGenDates,Dat_GenShamsiDate FROM Tss_GenDates 
+				WHERE (Dat_GenShamsiDate BETWEEN @Dat_LeaveStartDate AND @Dat_LevaEndedDate)
+				Order By Dat_GenShamsiDate
+
+			Open LeaveDates
+
+			Fetch Next From LeaveDates	into 
+				@SiGenDate,
+				@LeaveDate
+			
+			While @@Fetch_Status=0
+			Begin
+				select @SiEmpWorkGroups = dbo.Tss_EmpFindWorkGroupSi_Udf(@LeaveDate,convert(numeric,@SiPubPersonsSpec))
+				SELECT @Sta_WorkDayState=Sta_WorkDayState FROM Tss_EmpWorkTime	WHERE (SiGenDates = @SiGenDate) AND (SiEmpWorkGroups = @SiEmpWorkGroups)
+				Select @LeaveAmt = dbo.Tss_EmpFindLeaveAmt(@SiEmpLeaveDocs , convert(numeric,@SiPubPersonsSpec) , @LeaveDate )
+				if isnull(@LeaveAmt,0)>0
+				Begin
+					if exists(SELECT SiEmpLeaveCalc FROM Tss_EmpLeaveCalc WHERE (SiEmpLeaveDocs  = @SiEmpLeaveDocs ) and (Dat_LeaveDate=@LeaveDate))
+					Begin
+						If (@Sta_WorkDayState = 0)
+						Update dbo.Tss_EmpLeaveCalc Set
+							SiEmpLeaveDocs=@SiEmpLeaveDocs, 
+							Dat_LeaveDate=@LeaveDate, 
+							Num_LeaveUsedMin=@LeaveAmt
+						Where Dat_LeaveDate=@LeaveDate And SiEmpLeaveDocs=@SiEmpLeaveDocs
+						else
+						Update dbo.Tss_EmpLeaveCalc Set
+							SiEmpLeaveDocs=@SiEmpLeaveDocs, 
+							Dat_LeaveDate=@LeaveDate, 
+							Num_LeaveUsedMin=0
+						Where Dat_LeaveDate=@LeaveDate And SiEmpLeaveDocs=@SiEmpLeaveDocs
+					End
+					Else					
+					Insert Into dbo.Tss_EmpLeaveCalc
+						(SiEmpLeaveDocs,Dat_LeaveDate,Num_LeaveUsedMin) Values (@SiEmpLeaveDocs,@LeaveDate,@LeaveAmt)
+				End
+				Fetch Next From LeaveDates
+				Into @SiGenDate,@LeaveDate
+			End
+			Close LeaveDates
+			Deallocate LeaveDates
+		------------------------------------------------درج در محاسبه مرخصي------------------------------------------------------
+		Set @Err_Code=@@Error
+		If @Err_Code<>0
+			Set @Err_Code=401
+		Return
+	End
+	ELse
+		Set @Err_Code=402
+End
+-------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------
+If @FlgInsUpdDel=2
+Begin
+	Set @Err_Code=0
+	If Exists(
+	Select StmEmpLeaveDocs From dbo.Tss_EmpLeaveDocs
+	Where (SiEmpLeaveDocs=@SiEmpLeaveDocs) And (StmEmpLeaveDocs=@StmEmpLeaveDocs))
+	Begin
+
+				delete from dbo.Tss_EmpLeaveCalc 
+				Where  SiEmpLeaveDocs=@SiEmpLeaveDocs
+		Delete From dbo.Tss_EmpLeaveDocs
+		Where (SiEmpLeaveDocs=@SiEmpLeaveDocs)
+------------------------------------------------حذف محاسبه مرخصي-------------------------------------
+	Declare LeaveDates Cursor For
+	SELECT SiGenDates,Dat_GenShamsiDate FROM Tss_GenDates 
+	WHERE (Dat_GenShamsiDate BETWEEN @Dat_LeaveStartDate AND @Dat_LevaEndedDate)
+	Order By Dat_GenShamsiDate
+	Open LeaveDates
+	Fetch Next From LeaveDates
+	into @SiGenDate,@LeaveDate
+	
+	While @@Fetch_Status=0
+	Begin
+		If @Dat_LeaveStartDate<@Dat_LevaEndedDate
+		Begin
+			If @LeaveDate=@Dat_LeaveStartDate
+			Begin
+				SELECT @NumEndOfDay=(Num_WorkGroupStartTime+Num_WorkGroupLenTime),@Sta_WorkDayState=Sta_WorkDayState
+				FROM Tss_EmpWorkTime	WHERE (SiGenDates = @SiGenDate)
+				If (@Sta_WorkDayState = 0)
+				delete from dbo.Tss_EmpLeaveCalc 
+				Where  SiEmpLeaveDocs=@SiEmpLeaveDocs
+			End
+			else
+			If (@LeaveDate>@Dat_LeaveStartDate) And (@LeaveDate<@Dat_LevaEndedDate)
+			Begin
+				SELECT @NumStartOfDay=Num_WorkGroupStartTime,@NumEndOfDay=(Num_WorkGroupStartTime+Num_WorkGroupLenTime),@Sta_WorkDayState=Sta_WorkDayState
+				FROM Tss_EmpWorkTime	WHERE (SiGenDates = @SiGenDate)
+				If (@Sta_WorkDayState = 0)
+				delete from dbo.Tss_EmpLeaveCalc 
+				Where  SiEmpLeaveDocs=@SiEmpLeaveDocs
+				End
+				else
+			If (@LeaveDate=@Dat_LevaEndedDate)
+			Begin
+				SELECT @NumStartOfDay=Num_WorkGroupStartTime,@Sta_WorkDayState=Sta_WorkDayState
+				FROM Tss_EmpWorkTime	WHERE (SiGenDates = @SiGenDate)
+				If (@Sta_WorkDayState = 0)
+				delete from dbo.Tss_EmpLeaveCalc 
+				Where  SiEmpLeaveDocs=@SiEmpLeaveDocs
+			End
+			Fetch Next From LeaveDates
+			Into @SiGenDate,@LeaveDate
+		End
+		Else
+		If @Dat_LeaveStartDate=@Dat_LevaEndedDate
+		Begin
+			SELECT @NumStartOfDay=Num_WorkGroupStartTime,@Sta_WorkDayState=Sta_WorkDayState
+			FROM Tss_EmpWorkTime	WHERE (SiGenDates = @SiGenDate)
+			If (@Sta_WorkDayState = 0)
+			delete from dbo.Tss_EmpLeaveCalc 
+			Where  SiEmpLeaveDocs=@SiEmpLeaveDocs
+		End
+	Fetch Next From LeaveDates
+	into @SiGenDate,@LeaveDate
+
+	End
+	Close LeaveDates
+	Deallocate LeaveDates
+
+------------------------------------------------حذف محاسبه مرخصي-------------------------------------
+		Set @Err_Code=@@Error
+		If @Err_Code<>0
+			Set @Err_Code=4000
+	End
+	Else
+		Set @Err_Code=4001
+	Return
+End
