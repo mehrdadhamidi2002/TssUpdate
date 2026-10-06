@@ -6936,7 +6936,7 @@ BEGIN
     SELECT TRY_CAST(LEFT(v, CHARINDEX(':', v)-1) AS INT) AS TafType,
            TRY_CAST(SUBSTRING(v, CHARINDEX(':', v)+1, 30) AS NUMERIC(18,0)) AS SiTaf
     INTO #Taf
-    FROM (SELECT LTRIM(RTRIM(value)) AS v FROM STRING_SPLIT(ISNULL(@TafSelected,''), ',')) s
+    FROM (SELECT LTRIM(RTRIM(value)) AS v FROM dbo.Tss_StdStringSplitUdf(ISNULL(@TafSelected,''), ',')) s
     WHERE v LIKE '%:%'
 
     -- one row per Moein code (6 chars)
@@ -6982,7 +6982,7 @@ END
 GO
 /* ============================================================================
    Account Extensive Review - procedures used by AccUntAccountExtensiveReview
-   Run the whole script once (needs SQL Server 2017+: STRING_SPLIT / STRING_AGG).
+   Run the whole script once (needs SQL Server 2017+: dbo.Tss_StdStringSplitUdf / STRING_AGG).
    Procedures:
      1) Tss_AccUntAccountReviewRStp        (Group / Kol / Moein levels)
      2) Tss_AccUntAllTafsilisReviewVStp    (Tafsil level, also "last voucher" mode)
@@ -7041,7 +7041,7 @@ Declare
 
 SELECT LTRIM(RTRIM(value)) AS Pfx
 Into #Pfx
-FROM STRING_SPLIT(ISNULL(@AccPrefixes,''), ',')
+FROM dbo.Tss_StdStringSplitUdf(ISNULL(@AccPrefixes,''), ',')
 WHERE LTRIM(RTRIM(value))<>''
 
 SELECT
@@ -7345,7 +7345,7 @@ BEGIN
    -- account prefixes (new list parameter; falls back to the old single-code parameter)
    SELECT LTRIM(RTRIM(value)) AS Pfx
    INTO #Pfx
-   FROM STRING_SPLIT(CASE WHEN ISNULL(@AccPrefixes,'')<>'' THEN @AccPrefixes ELSE ISNULL(@AccMoeinCode,'') END, ',')
+   FROM dbo.Tss_StdStringSplitUdf(CASE WHEN ISNULL(@AccPrefixes,'')<>'' THEN @AccPrefixes ELSE ISNULL(@AccMoeinCode,'') END, ',')
    WHERE LTRIM(RTRIM(value))<>''
 
    DECLARE @HasPfx BIT = CASE WHEN EXISTS (SELECT 1 FROM #Pfx) THEN 1 ELSE 0 END
@@ -7548,14 +7548,14 @@ BEGIN
     -- Account-code prefixes
     SELECT LTRIM(RTRIM(value)) AS Pfx
     INTO #Pfx
-    FROM STRING_SPLIT(ISNULL(@AccCodePrefix,''), ',')
+    FROM dbo.Tss_StdStringSplitUdf(ISNULL(@AccCodePrefix,''), ',')
     WHERE LTRIM(RTRIM(value))<>''
 
     -- Tafsil selection pairs (type:si)
     SELECT TRY_CAST(LEFT(v, CHARINDEX(':', v)-1) AS INT) AS TafType,
            TRY_CAST(SUBSTRING(v, CHARINDEX(':', v)+1, 30) AS NUMERIC(18,0)) AS SiTaf
     INTO #Taf
-    FROM (SELECT LTRIM(RTRIM(value)) AS v FROM STRING_SPLIT(ISNULL(@TafSelected,''), ',')) s
+    FROM (SELECT LTRIM(RTRIM(value)) AS v FROM dbo.Tss_StdStringSplitUdf(ISNULL(@TafSelected,''), ',')) s
     WHERE v LIKE '%:%'
 
     DECLARE @AccFilter VARCHAR(MAX)=''
@@ -7797,4 +7797,35 @@ BEGIN
     DROP TABLE IF EXISTS #Taf
 END
 GO
+
+CREATE or alter  FUNCTION dbo.Tss_StdStringSplitUdf
+(
+    @List  NVARCHAR(MAX),
+    @Delim NCHAR(1) = N','
+)
+RETURNS @T TABLE
+(
+    value NVARCHAR(MAX)
+)
+AS
+BEGIN
+    IF @List IS NULL OR @List = N'' RETURN;
+
+    DECLARE @Pos INT, @Prev INT;
+    SET @Prev = 1;
+    SET @Pos  = CHARINDEX(@Delim, @List, @Prev);
+
+    WHILE @Pos > 0
+    BEGIN
+        INSERT @T(value) VALUES (SUBSTRING(@List, @Prev, @Pos - @Prev));
+        SET @Prev = @Pos + 1;
+        SET @Pos  = CHARINDEX(@Delim, @List, @Prev);
+    END
+
+    -- last token
+    INSERT @T(value) VALUES (SUBSTRING(@List, @Prev, LEN(@List) - @Prev + 1));
+    RETURN;
+END
+
+
 GO
