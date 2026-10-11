@@ -7886,6 +7886,38 @@ END
 
 GO
 
+CREATE or alter FUNCTION dbo.Tss_StdStringSplitUdf
+(
+    @List  NVARCHAR(MAX),
+    @Delim NCHAR(1) = N','
+)
+RETURNS @T TABLE
+(
+    value NVARCHAR(MAX)
+)
+AS
+BEGIN
+    IF @List IS NULL OR @List = N'' RETURN;
+
+    DECLARE @Pos INT, @Prev INT;
+    SET @Prev = 1;
+    SET @Pos  = CHARINDEX(@Delim, @List, @Prev);
+
+    WHILE @Pos > 0
+    BEGIN
+        INSERT @T(value) VALUES (SUBSTRING(@List, @Prev, @Pos - @Prev));
+        SET @Prev = @Pos + 1;
+        SET @Pos  = CHARINDEX(@Delim, @List, @Prev);
+    END
+
+    -- last token
+    INSERT @T(value) VALUES (SUBSTRING(@List, @Prev, LEN(@List) - @Prev + 1));
+    RETURN;
+END
+
+
+GO
+
 alter PROCEDURE Tss_AccUntTafsiliReview_03VStp
 (
     @InternalWhere VARCHAR(8000)='',
