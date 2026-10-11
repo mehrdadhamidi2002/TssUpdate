@@ -7941,13 +7941,13 @@ BEGIN
 
     SELECT LTRIM(RTRIM(value)) AS Pfx
     INTO #Pfx
-    FROM STRING_SPLIT(ISNULL(@AccCodePrefix,''), ',')
+    FROM dbo.Tss_StdStringSplitUdf(ISNULL(@AccCodePrefix,''), ',')
     WHERE LTRIM(RTRIM(value))<>''
 
     SELECT TRY_CAST(LEFT(v, CHARINDEX(':', v)-1) AS INT) AS TafType,
            TRY_CAST(SUBSTRING(v, CHARINDEX(':', v)+1, 30) AS NUMERIC(18,0)) AS SiTaf
     INTO #Taf
-    FROM (SELECT LTRIM(RTRIM(value)) AS v FROM STRING_SPLIT(ISNULL(@TafSelected,''), ',')) s
+    FROM (SELECT LTRIM(RTRIM(value)) AS v FROM dbo.Tss_StdStringSplitUdf(ISNULL(@TafSelected,''), ',')) s
     WHERE v LIKE '%:%'
 
     DECLARE @AccFilter VARCHAR(MAX)=''
@@ -8165,5 +8165,4 @@ BEGIN
     DROP TABLE IF EXISTS #Pfx
     DROP TABLE IF EXISTS #Taf
 END
-
 GO
