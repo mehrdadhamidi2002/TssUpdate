@@ -7881,7 +7881,7 @@ BEGIN
       AND L.L1 IS NOT NULL
     ORDER BY 
         C.Num_Layer, 
-        C.Cod_GoodsClassCode
+        C.Des_GoodsClassDesc
 END
 
 GO
