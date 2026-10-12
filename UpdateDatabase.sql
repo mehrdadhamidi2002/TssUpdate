@@ -8198,3 +8198,500 @@ BEGIN
     DROP TABLE IF EXISTS #Taf
 END
 GO
+
+alter PROCEDURE Tss_AccUntTafsiliReview_01VStp
+(
+   @InternalWhere VarChar(8000)='',
+   @Where VarChar(8000)='',
+   @Order VarChar(8000)='',
+   @FlgTafType SmallInt=1,
+   @DsFromDate VarChar(10)='1401/01/01',
+   @DsToDate VarChar(10)='1401/09/20',
+	@SiUser Numeric=11224,
+	@Sta_GardeshDar smallint=0
+) 
+AS 
+Set XACT_ABORT ON
+
+Set arithabort ON
+Set concat_null_yields_null ON
+Set ansi_nulls ON
+Set ansi_null_dflt_on ON
+Set ansi_padding ON
+Set ansi_warnings ON
+Set quoted_identifier ON
+
+
+If @InternalWhere<>'' 
+   Set @InternalWhere=' Where '+@InternalWhere
+If @Where<>'' 
+   Set @Where=' Where '+@Where
+If @Order<>'' 
+   Set @Order=' Order By '+@Order
+
+Declare
+   @SqlTxt VarChar(2000),
+	@UserGroup VarChar(500),
+	@SiPer varchar(50),
+	@AccAllDocs smallint
+
+select @AccAllDocs = dbo.Tss_StdFindSystemParamValue('AccAllDocs')
+
+Set @UserGroup = ''
+SELECT     
+	@UserGroup = isnull(Tss_PubCustomCodes.Des_CustomCodesDesc,'') ,
+	@SiPer = convert(varchar(50),Tss_StdSystemUsers.SiPubPersonsSpec)
+FROM         
+	Tss_StdSystemUserTogrps INNER JOIN
+	Tss_PubCustomCodes ON Tss_StdSystemUserTogrps.SiPubCustomCodes = Tss_PubCustomCodes.SiPubCustomCodes INNER JOIN
+	Tss_StdSystemUsers ON Tss_StdSystemUserTogrps.SiStdSystemUsers = Tss_StdSystemUsers.SiStdSystemUsers
+WHERE     
+	(Tss_StdSystemUsers.SiPubPersonsSpec = @SiUser)
+
+if @Sta_GardeshDar =1
+Begin
+	If (@FlgTafType=1) and (dbo.Tss_StdFindIfUserIsInGroup(@SiUser,'sal')=1) and (dbo.Tss_StdFindIfUserIsInGroup(@SiUser,'acc')<>1)
+	Exec('Select distinct * From 
+	   (
+		SELECT     
+			Accdt.SiPubPersonsSpec1 As SiTaf, 
+			Tss_PubPersonsViw.Cod_PubPersonCode As CodeTaf, 
+			Tss_PubPersonsViw.Des_FullName As NameTaf,
+--			dbo.Tss_PubFindRelatedSalerDes(Tss_PubPersonsViw.SiPerRelatedSaler) as RelatedSaler
+			Tss_PubPersonsViw.RelatedSalerFamily as RelatedSaler,
+			Tss_PubPersonsViw.Sta_PerNature,
+			Tss_PubPersonsViw.Sta_PerNatureDes
+		FROM         
+			Tss_AccVoucher_Dt Accdt INNER JOIN
+			Tss_AccVoucher_Hd Acchd ON Accdt.SiAccVoucher_Hd = Acchd.SiAccVoucher_Hd INNER JOIN
+			Tss_PubPersonsViw ON Accdt.SiPubPersonsSpec1 = Tss_PubPersonsViw.SiPubPersonsSpec
+		WHERE     
+			(Acchd.Dat_VhedDate between '+''''+@DsFromDate+''''+' and '+''''+@DsToDate+''''+' AND (Tss_PubPersonsViw.SiPerRelatedSaler ='+@SiPer+'))'+@InternalWhere +'
+	   ) CalcSel '+ @Where + @Order)
+	
+	If (@FlgTafType=1) and (dbo.Tss_StdFindIfUserIsInGroup(@SiUser,'sal')<>1)
+	Exec('Select * From 
+	   (
+		SELECT distinct    
+			Accdt.SiPubPersonsSpec1 As SiTaf, 
+			Tss_PubPersonsViw.Cod_PubPersonCode As CodeTaf, 
+			Tss_PubPersonsViw.Des_FullName As NameTaf,
+			Tss_PubPersonsViw.Sta_PerNature,
+			Tss_PubPersonsViw.Sta_PerNatureDes
+		FROM         
+			Tss_AccVoucher_Dt Accdt INNER JOIN
+			Tss_AccVoucher_Hd Acchd ON Accdt.SiAccVoucher_Hd = Acchd.SiAccVoucher_Hd INNER JOIN
+			Tss_PubPersonsViw ON Accdt.SiPubPersonsSpec1 = Tss_PubPersonsViw.SiPubPersonsSpec
+		WHERE     
+			(Acchd.Dat_VhedDate between '+''''+@DsFromDate+''''+' and '+''''+@DsToDate+''''+')'+@InternalWhere +'
+	   ) CalcSel '+ @Where + @Order)
+	If (@FlgTafType=1) and (dbo.Tss_StdFindIfUserIsInGroup(@SiUser,'Acc')=1)
+	Exec('Select * From 
+	   (
+		SELECT distinct    
+			Accdt.SiPubPersonsSpec1 As SiTaf, 
+			Tss_PubPersonsViw.Cod_PubPersonCode As CodeTaf, 
+			Tss_PubPersonsViw.Des_FullName As NameTaf,
+--			dbo.Tss_PubFindRelatedSalerDes(Tss_PubPersonsViw.SiPerRelatedSaler) as RelatedSaler
+			Tss_PubPersonsViw.RelatedSalerFamily as RelatedSaler,
+			Tss_PubPersonsViw.Sta_PerNature,
+			Tss_PubPersonsViw.Sta_PerNatureDes
+		FROM         
+			Tss_AccVoucher_Dt Accdt INNER JOIN
+			Tss_AccVoucher_Hd Acchd ON Accdt.SiAccVoucher_Hd = Acchd.SiAccVoucher_Hd INNER JOIN
+			Tss_PubPersonsViw ON Accdt.SiPubPersonsSpec1 = Tss_PubPersonsViw.SiPubPersonsSpec
+		WHERE     
+			(Acchd.Dat_VhedDate between '+''''+@DsFromDate+''''+' and '+''''+@DsToDate+''''+')'+@InternalWhere +'
+	   ) CalcSel '+ @Where + @Order)
+End
+if @Sta_GardeshDar = 0
+Begin
+	If (@FlgTafType=1) and (dbo.Tss_StdFindIfUserIsInGroup(@SiUser,'sal')=1) and (dbo.Tss_StdFindIfUserIsInGroup(@SiUser,'acc')<>1)
+	begin
+	print 'injam'
+	if dbo.Tss_StdFindSubLoc(0)='Caspian'
+	Exec('Select * From 
+	   (
+	   SELECT     
+	      SiPubPersonsSpec As SiTaf, 
+	      Cod_PubPersonCode As CodeTaf , 
+	      Des_FullName As NameTaf,
+--			dbo.Tss_PubFindRelatedSalerDes(Tss_PubPersonsViw.SiPerRelatedSaler) as RelatedSaler
+			Tss_PubPersonsViw.RelatedSalerFamily as RelatedSaler,
+			Tss_PubPersonsViw.Sta_PerNature,
+			Tss_PubPersonsViw.Sta_PerNatureDes
+	   FROM  
+			dbo.Tss_PubPersonsViw 
+		Where
+			(Tss_PubPersonsViw.SiPerRelatedSaler ='+@SiPer+') and SiPerRelatedSaler = '+@SiPer+@InternalWhere +'
+	   ) CalcSel '+ @Where + @Order)
+	else
+		Exec('Select * From 
+	   (
+	   SELECT     
+	      SiPubPersonsSpec As SiTaf, 
+	      Cod_PubPersonCode As CodeTaf , 
+	      Des_FullName As NameTaf,
+--			dbo.Tss_PubFindRelatedSalerDes(Tss_PubPersonsViw.SiPerRelatedSaler) as RelatedSaler
+			Tss_PubPersonsViw.RelatedSalerFamily as RelatedSaler,
+			Tss_PubPersonsViw.Sta_PerNature,
+			Tss_PubPersonsViw.Sta_PerNatureDes
+	   FROM  
+			dbo.Tss_PubPersonsViw 
+		Where
+			Sta_PubPersonsGroup=2
+	   ) CalcSel '+ @Where + @Order)
+	end
+	If (@FlgTafType=1) and (dbo.Tss_StdFindIfUserIsInGroup(@SiUser,'sal')<>1)
+	Exec('Select * From 
+	   (
+	   SELECT     
+	      SiPubPersonsSpec As SiTaf, 
+	      Cod_PubPersonCode As CodeTaf , 
+	      Des_FullName As NameTaf,
+--			dbo.Tss_PubFindRelatedSalerDes(Tss_PubPersonsViw.SiPerRelatedSaler) as RelatedSaler
+			Tss_PubPersonsViw.RelatedSalerFamily as RelatedSaler,
+			Tss_PubPersonsViw.Sta_PerNature,
+			Tss_PubPersonsViw.Sta_PerNatureDes
+	   FROM  dbo.Tss_PubPersonsViw '+@InternalWhere +'
+	   ) CalcSel '+ @Where + @Order)
+	If (@FlgTafType=1) and (dbo.Tss_StdFindIfUserIsInGroup(@SiUser,'Acc')=1)
+	Exec('Select * From 
+	   (
+	   SELECT     
+	      SiPubPersonsSpec As SiTaf, 
+	      Cod_PubPersonCode As CodeTaf , 
+	      Des_FullName As NameTaf,
+--			dbo.Tss_PubFindRelatedSalerDes(Tss_PubPersonsViw.SiPerRelatedSaler) as RelatedSaler
+			Tss_PubPersonsViw.RelatedSalerFamily as RelatedSaler,
+			Tss_PubPersonsViw.Sta_PerNature,
+			Tss_PubPersonsViw.Sta_PerNatureDes
+	   FROM  dbo.Tss_PubPersonsViw '+@InternalWhere +'
+	   ) CalcSel '+ @Where + @Order)
+
+End
+If @FlgTafType=2
+Exec('Select * From 
+   (
+   SELECT     
+	SiPubCostCenter As SiTaf, 
+	Cod_CostCenterCode As CodeTaf, 
+	Des_CostCenterName As NameTaf,
+	'''' as RelatedSaler,
+	0 as Sta_PerNature,
+	'''' as Sta_PerNatureDes
+   FROM         dbo.Tss_PubCostCenter '+@InternalWhere +'
+   ) CalcSel '+ @Where + @Order)
+
+If @FlgTafType=3
+Exec('Select * From 
+   (
+   SELECT     
+	SiPubProjects As SiTaf, 
+	Cod_ProjectsCode As CodeTaf, 
+	Des_ProjectsThemeDesc As NameTaf,
+	'''' as RelatedSaler,
+	0 as Sta_PerNature,
+	'''' as Sta_PerNatureDes
+   FROM         dbo.Tss_PubProjects '+@InternalWhere +'
+   ) CalcSel '+ @Where + @Order)
+
+If @FlgTafType=4
+Exec('Select * From 
+   (
+   SELECT     
+		SiCntContracts_Hd AS SiTaf, 
+		Cod_CntContractsCode AS CodeTaf, 
+		Des_CntContractsDesc AS NameTaf, 
+		'''' AS RelatedSaler,
+		0 as Sta_PerNature,
+		'''' as Sta_PerNatureDes
+	FROM         
+		Tss_CntContracts_Hd '+@InternalWhere +'
+   ) CalcSel '+ @Where + @Order)
+PRINT @SqlTxt
+Exec(@SqlTxt)
+
+GO
+
+alter PROCEDURE Tss_AccUntTafsiliReview_03VStp
+(
+    @InternalWhere VARCHAR(8000)='',
+    @Where VARCHAR(8000)='',
+    @Order VARCHAR(8000)='',
+    @DsFromDate VARCHAR(10)='1399/01/01',
+    @DsToDate VARCHAR(10)='1399/09/07',
+    @SiAccFinancePeriod NUMERIC=20,
+    @SiPubSubLocations VARCHAR(500)='1,2',
+    @Sta_Start SMALLINT=0,
+    @Sta_End SMALLINT=0,
+    @Sta_Close SMALLINT=0,
+    @StaMandehOrNot SMALLINT=1,
+    @SiAccCodeBook VARCHAR(MAX)='',
+    @SiSelected VARCHAR(50)='',
+    @SiUser NUMERIC=1,
+    @AccCodePrefix VARCHAR(MAX)='',
+    @FlgTafType SMALLINT=-1,
+    @TafSelected VARCHAR(MAX)=''
+)
+AS
+BEGIN
+    SET NOCOUNT ON
+    SET XACT_ABORT, ARITHABORT, CONCAT_NULL_YIELDS_NULL, ANSI_NULLS, ANSI_NULL_DFLT_ON, ANSI_PADDING, ANSI_WARNINGS, QUOTED_IDENTIFIER ON
+
+    DROP TABLE IF EXISTS #TmpVchTaf
+    DROP TABLE IF EXISTS #TmpVchTafMandeh
+    DROP TABLE IF EXISTS #TmpVchTafBaBiMandeh
+    DROP TABLE IF EXISTS #TempTable
+    DROP TABLE IF EXISTS #Pfx
+    DROP TABLE IF EXISTS #Taf
+
+    SET @InternalWhere = CASE WHEN @InternalWhere IS NOT NULL AND @InternalWhere<>'' THEN ' WHERE '+@InternalWhere ELSE '' END
+    SET @Where = CASE WHEN @Where IS NOT NULL AND @Where<>'' THEN ' WHERE '+@Where ELSE '' END
+    SET @Order = CASE WHEN @Order IS NOT NULL AND @Order<>'' THEN ' ORDER BY '+@Order ELSE '' END
+
+    DECLARE @WhType VARCHAR(300)=CASE
+        WHEN @Sta_Start=0 THEN (SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=0) ELSE '' END
+    SET @WhType = ISNULL(@WhType,'')
+    SET @WhType = @WhType + CASE WHEN @Sta_End=0 AND @WhType<>'' THEN ',' ELSE '' END +
+        CASE WHEN @Sta_End=0 THEN ISNULL((SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=1),'') ELSE '' END
+    SET @WhType = @WhType + CASE WHEN @Sta_Close=0 AND @WhType<>'' THEN ',' ELSE '' END +
+        CASE WHEN @Sta_Close=0 THEN ISNULL((SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=3),'') ELSE '' END
+    SET @WhType = CASE WHEN @WhType<>'' THEN ' AND vHed.SiAccVoucherType NOT IN ('+@WhType+')' ELSE '' END
+
+    DECLARE @TafName VARCHAR(100)=CASE @FlgTafType
+        WHEN 0 THEN 'SiPubPersonsSpec1'
+        WHEN 1 THEN 'SiPubCostCenter1'
+        WHEN 2 THEN 'SiPubProjects1'
+        ELSE CASE (SELECT TOP 1 Sta_TafType1 FROM Tss_AccCodeBook WHERE SiAccCodeBook=(SELECT TOP 1 SiSel FROM dbo.Tss_StdStringSiFindUdf(@SiAccCodeBook)))
+            WHEN 1 THEN 'SiPubPersonsSpec1' WHEN 2 THEN 'SiPubCostCenter1' WHEN 3 THEN 'SiPubProjects1' WHEN 4 THEN 'SiPurOrder_Hd1' END
+        END
+
+    SELECT LTRIM(RTRIM(value)) AS Pfx
+    INTO #Pfx
+    FROM STRING_SPLIT(ISNULL(@AccCodePrefix,''), ',')
+    WHERE LTRIM(RTRIM(value))<>''
+
+    SELECT TRY_CAST(LEFT(v, CHARINDEX(':', v)-1) AS INT) AS TafType,
+           TRY_CAST(SUBSTRING(v, CHARINDEX(':', v)+1, 30) AS NUMERIC(18,0)) AS SiTaf
+    INTO #Taf
+    FROM (SELECT LTRIM(RTRIM(value)) AS v FROM STRING_SPLIT(ISNULL(@TafSelected,''), ',')) s
+    WHERE v LIKE '%:%'
+
+    DECLARE @AccFilter VARCHAR(MAX)=''
+    IF EXISTS (SELECT 1 FROM #Pfx)
+        SET @AccFilter = ' AND EXISTS (SELECT 1 FROM #Pfx p WHERE cBook.Cod_AccountCode LIKE p.Pfx + ''%'')'
+    ELSE IF ISNULL(@SiAccCodeBook,'')<>''
+        SET @AccFilter = ' AND cBook.SiAccCodeBook IN (SELECT SiSel FROM dbo.Tss_StdStringSiFindUdf(''' + @SiAccCodeBook + '''))'
+
+    DECLARE @TafFilter VARCHAR(1000)=''
+    IF EXISTS (SELECT 1 FROM #Taf)
+        SET @TafFilter = ' AND EXISTS (SELECT 1 FROM #Taf t WHERE (t.TafType=0 AND vDet.SiPubPersonsSpec1=t.SiTaf) OR (t.TafType=1 AND vDet.SiPubCostCenter1=t.SiTaf) OR (t.TafType=2 AND vDet.SiPubProjects1=t.SiTaf))'
+    ELSE IF ISNULL(@SiSelected,'')<>'' AND @TafName IS NOT NULL
+        SET @TafFilter = ' AND vDet.' + @TafName + ' = ' + @SiSelected
+
+    DECLARE @AccAllDocs SMALLINT = dbo.Tss_StdFindSystemParamValue('AccAllDocs')
+
+    DECLARE @HiddenFilter VARCHAR(500)
+    IF dbo.Tss_StdFindIfUserIsInGroup(@SiUser,'AccStar') = 1
+        SET @HiddenFilter = ''
+    ELSE
+        SET @HiddenFilter = ' AND (vDet.Sta_IsHidden = 0 OR vDet.Sta_IsHidden IS NULL) '
+
+    SELECT SiAccFinancePeriodToPlace INTO #TempTable FROM dbo.Tss_AccFinancePeriodToPlace
+    WHERE SiPubSubLocations IN (SELECT * FROM dbo.Tss_StdStringSiFindUdf(@SiPubSubLocations))
+
+    CREATE TABLE #TmpVchTaf (
+        SiAccVoucher_Hd NUMERIC NULL,
+        Dat_VhedDate VARCHAR(10) NULL,
+        Num_VDetRow INT NULL,
+        Des_VdetDesc NVARCHAR(4000) NULL,
+        Num_VdetDebtAmount BIGINT NULL,
+        Num_VdetCreditAmount BIGINT NULL,
+        Num_VhedFinalNo DECIMAL(18,0) NULL,
+        Num_VhedSubNo NUMERIC(18,0) NULL,
+        Cod_AccountCode VARCHAR(50) NULL,
+        Des_AccountDesc NVARCHAR(200) NULL,
+        TafCode VARCHAR(50) NULL,
+        TafName NVARCHAR(401) NULL
+    )
+
+    DECLARE @StatusFilter VARCHAR(100)=CASE WHEN @AccAllDocs=0 THEN 'vHed.Sta_VochStatus >= 3 AND vHed.Sta_VochStatus <> 5 AND ' ELSE 'vHed.Sta_VochStatus >= 3 AND ' END
+
+    DECLARE @SqlTxt NVARCHAR(MAX)=N'
+    SELECT
+        vHed.SiAccVoucher_Hd,
+        vHed.Dat_VhedDate,
+        vDet.Num_VDetRow,
+        Des_VdetDesc = CAST(CASE WHEN Tss_AccVoucherType.Sta_VoucherTypeGroup IN (4,5)
+            THEN ISNULL(vDet.Des_VdetDesc,'''')
+            ELSE vDet.Des_VdetDesc
+        END AS NVARCHAR(4000)),
+        CAST(vDet.Num_VdetDebtAmount AS BIGINT) AS Num_VdetDebtAmount,
+        CAST(vDet.Num_VdetCreditAmount AS BIGINT) AS Num_VdetCreditAmount,
+        CAST(vHed.Num_VhedFinalNo AS DECIMAL(18,0)) AS Num_VhedFinalNo,
+        CAST(vHed.SiAccVoucher_Hd AS NUMERIC(18,0)) AS Num_VhedSubNo,
+        CAST(cBook.Cod_AccountCode AS VARCHAR(50)) AS Cod_AccountCode,
+        CAST(cBook.Des_AccountDesc AS NVARCHAR(200)) AS Des_AccountDesc,
+        CAST(COALESCE(pv.Cod_PubPersonCode, cc.Cod_CostCenterCode, pr.Cod_ProjectsCode, '''') AS VARCHAR(50)) AS TafCode,
+        CAST(COALESCE(pv.Des_FullName, cc.Des_CostCenterName, pr.Des_ProjectsThemeDesc, '''') AS NVARCHAR(401)) AS TafName
+    FROM Tss_AccCodeBook cBook
+    INNER JOIN Tss_AccVoucher_Dt vDet ON cBook.SiAccCodeBook = vDet.SiAccCodeBook
+    INNER JOIN Tss_AccVoucher_Hd vHed ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd
+    INNER JOIN Tss_AccVoucherType ON vHed.SiAccVoucherType = Tss_AccVoucherType.SiAccVoucherType
+    LEFT JOIN Tss_PubPersonsViw pv ON vDet.SiPubPersonsSpec1 = pv.SiPubPersonsSpec
+    LEFT JOIN Tss_PubCostCenter cc ON vDet.SiPubCostCenter1 = cc.SiPubCostCenter
+    LEFT JOIN Tss_PubProjects pr ON vDet.SiPubProjects1 = pr.SiPubProjects
+    WHERE ' + @StatusFilter + N'
+        vHed.SiAccFinancePeriodToPlace IN (SELECT SiAccFinancePeriodToPlace FROM #TempTable)
+        AND vHed.Dat_VhedDate BETWEEN ''' + @DsFromDate + N''' AND ''' + @DsToDate + N'''
+        ' + @AccFilter + N'
+        ' + @TafFilter + N'
+        ' + @HiddenFilter + N'
+        ' + @WhType
+
+    DECLARE @InsertSql NVARCHAR(MAX) = N'
+    INSERT INTO #TmpVchTaf
+    SELECT * FROM (' + @SqlTxt + N') AS Ccc
+    ' + @InternalWhere + N'
+    ' + @Where + N'
+    ' + @Order
+
+    BEGIN TRY
+        EXEC sp_executesql @InsertSql
+    END TRY
+    BEGIN CATCH
+        PRINT 'Error inserting into #TmpVchTaf: ' + ERROR_MESSAGE()
+    END CATCH
+
+    CREATE TABLE #TmpVchTafMandeh (
+        Num_VdetDebtAmount BIGINT NULL,
+        Num_VdetCreditAmount BIGINT NULL
+    )
+
+    DECLARE @SqlTxtMandeh NVARCHAR(MAX)=N'
+    SELECT
+        CAST(SUM(vDet.Num_VdetDebtAmount) AS BIGINT) AS Num_VdetDebtAmount,
+        CAST(SUM(vDet.Num_VdetCreditAmount) AS BIGINT) AS Num_VdetCreditAmount
+    FROM Tss_AccCodeBook cBook
+    INNER JOIN Tss_AccVoucher_Dt vDet ON cBook.SiAccCodeBook = vDet.SiAccCodeBook
+    INNER JOIN Tss_AccVoucher_Hd vHed ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd
+    WHERE ' + @StatusFilter + N'
+        vHed.SiAccFinancePeriodToPlace IN (SELECT SiAccFinancePeriodToPlace FROM #TempTable)
+        AND vHed.Dat_VhedDate BETWEEN ''1385/01/01'' AND ''' + dbo.Tss_StdOneDayDecUdf(@DsFromDate) + N'''
+        ' + @AccFilter + N'
+        ' + @TafFilter + N'
+        ' + @HiddenFilter + N'
+        ' + @WhType
+
+    DECLARE @InsertMandehSql NVARCHAR(MAX) = N'
+    INSERT INTO #TmpVchTafMandeh
+    SELECT * FROM (' + @SqlTxtMandeh + N') AS Ccc'
+
+    BEGIN TRY
+        EXEC sp_executesql @InsertMandehSql
+    END TRY
+    BEGIN CATCH
+        PRINT 'Error inserting into #TmpVchTafMandeh: ' + ERROR_MESSAGE()
+    END CATCH
+
+    CREATE TABLE #TmpVchTafBaBiMandeh (
+        SiAccVoucher_Hd NUMERIC NULL,
+        Dat_VhedDate VARCHAR(10) NULL,
+        Num_VDetRow INT NULL,
+        Des_VdetDesc NVARCHAR(4000) NULL,
+        Num_VdetDebtAmount BIGINT NULL,
+        Num_VdetCreditAmount BIGINT NULL,
+        Num_VhedFinalNo DECIMAL(18,0) NULL,
+        Num_VhedSubNo NUMERIC(18,0) NULL,
+        Cod_AccountCode VARCHAR(50) NULL,
+        Des_AccountDesc NVARCHAR(200) NULL,
+        TafCode VARCHAR(50) NULL,
+        TafName NVARCHAR(401) NULL
+    )
+
+    DECLARE @SqlTxtBaBiMandeh NVARCHAR(MAX)
+    IF @StaMandehOrNot = 1
+    BEGIN
+        SET @SqlTxtBaBiMandeh = N'
+        SELECT
+            CAST(0 AS NUMERIC) AS SiAccVoucher_Hd,
+            CAST('''' AS VARCHAR(10)) AS Dat_VhedDate,
+            0 AS Num_VDetRow,
+            CAST(N''مانده از قبل'' AS NVARCHAR(4000)) AS Des_VdetDesc,
+            CAST(ISNULL(Num_VdetDebtAmount, 0) AS BIGINT) AS Num_VdetDebtAmount,
+            CAST(ISNULL(Num_VdetCreditAmount, 0) AS BIGINT) AS Num_VdetCreditAmount,
+            CAST(0 AS DECIMAL(18,0)) AS Num_VhedFinalNo,
+            CAST(0 AS NUMERIC(18,0)) AS Num_VhedSubNo,
+            CAST('''' AS VARCHAR(50)) AS Cod_AccountCode,
+            CAST('''' AS NVARCHAR(200)) AS Des_AccountDesc,
+            CAST('''' AS VARCHAR(50)) AS TafCode,
+            CAST('''' AS NVARCHAR(401)) AS TafName
+        FROM #TmpVchTafMandeh
+        UNION ALL
+        SELECT
+            SiAccVoucher_Hd, Dat_VhedDate, Num_VDetRow, Des_VdetDesc,
+            Num_VdetDebtAmount, Num_VdetCreditAmount, Num_VhedFinalNo, Num_VhedSubNo,
+            Cod_AccountCode, Des_AccountDesc, TafCode, TafName
+        FROM #TmpVchTaf'
+    END
+    ELSE
+    BEGIN
+        SET @SqlTxtBaBiMandeh = N'
+        SELECT
+            SiAccVoucher_Hd, Dat_VhedDate, Num_VDetRow, Des_VdetDesc,
+            Num_VdetDebtAmount, Num_VdetCreditAmount, Num_VhedFinalNo, Num_VhedSubNo,
+            Cod_AccountCode, Des_AccountDesc, TafCode, TafName
+        FROM #TmpVchTaf'
+    END
+
+    DECLARE @InsertCombineSql NVARCHAR(MAX) = N'
+    INSERT INTO #TmpVchTafBaBiMandeh
+    SELECT * FROM (' + @SqlTxtBaBiMandeh + N') AS Ccc
+    ' + @InternalWhere + N'
+    ' + @Where + N'
+    ' + @Order
+
+    BEGIN TRY
+        EXEC sp_executesql @InsertCombineSql
+    END TRY
+    BEGIN CATCH
+        PRINT 'Error inserting into #TmpVchTafBaBiMandeh: ' + ERROR_MESSAGE()
+    END CATCH
+
+    ;WITH FinalData AS (
+        SELECT
+            CAST(ROW_NUMBER() OVER (ORDER BY Dat_VhedDate, SiAccVoucher_Hd, Num_VDetRow) AS DECIMAL(18,0)) AS MyId,
+            SiAccVoucher_Hd,
+            CAST(Num_VhedFinalNo AS DECIMAL(18,0)) AS Num_VhedFinalNo,
+            CAST(Num_VhedSubNo AS NUMERIC(18,0)) AS Num_VhedSubNo,
+            Dat_VhedDate,
+            LEFT(Dat_VhedDate, 7) AS Dat_VhedDateMonth,
+            Num_VDetRow,
+            Des_VdetDesc,
+            CAST(Num_VdetDebtAmount AS BIGINT) AS Num_VdetDebtAmount,
+            CAST(Num_VdetCreditAmount AS BIGINT) AS Num_VdetCreditAmount,
+            CAST(Num_VdetDebtAmount - Num_VdetCreditAmount AS BIGINT) AS Acc_Rest,
+            Cod_AccountCode, Des_AccountDesc, TafCode, TafName
+        FROM #TmpVchTafBaBiMandeh
+    ),
+    RunningSum AS (
+        SELECT *, SUM(Acc_Rest) OVER (ORDER BY MyId ROWS UNBOUNDED PRECEDING) AS Acc_Rest_Sum
+        FROM FinalData
+    )
+    SELECT
+        MyId, SiAccVoucher_Hd, Num_VhedFinalNo, Num_VhedSubNo, Dat_VhedDate, Dat_VhedDateMonth,
+        Num_VDetRow, Des_VdetDesc, Num_VdetDebtAmount, Num_VdetCreditAmount, Acc_Rest, Acc_Rest_Sum,
+        Cod_AccountCode, Des_AccountDesc, TafCode, TafName
+    FROM RunningSum
+    ORDER BY MyId
+
+    DROP TABLE IF EXISTS #TempTable
+    DROP TABLE IF EXISTS #TmpVchTaf
+    DROP TABLE IF EXISTS #TmpVchTafMandeh
+    DROP TABLE IF EXISTS #TmpVchTafBaBiMandeh
+    DROP TABLE IF EXISTS #Pfx
+    DROP TABLE IF EXISTS #Taf
+END
+
+GO
