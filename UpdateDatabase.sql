@@ -8695,3 +8695,968 @@ BEGIN
 END
 
 GO
+
+alter proc Tss_RapFrmRecievedChequeRepRStpAll
+(
+    @SiPubSubLocations numeric=0,
+    @SiRapCashDefine numeric=0,
+    @SiPubPersonsSpec numeric=0,
+    @GhabzNo varchar(50)='',
+    @RegDate varchar(10)='1404/01/01',
+    @RegDate2 varchar(10)='1404/12/29',
+    @UsanceDate varchar(10)='',
+    @UsanceDate2 varchar(10)='',
+    @Dat_RapReceivedChequeVosoolDate varchar(10)='',
+    @Dat_RapReceivedChequeVosoolDate2 varchar(10)='',
+    @Dat_RapReceivedChequeBargashtDate varchar(10)='',
+    @Dat_RapReceivedChequeBargashtDate2 varchar(10)='',
+    @Dat_RapReceivedChequeToPerDate varchar(10)='',
+    @Dat_RapReceivedChequeToPerDate2 varchar(10)='',
+    @Dat_RapReceivedChequeToBankDate varchar(10)='',
+    @Dat_RapReceivedChequeToBankDate2 varchar(10)='',
+    @Dat_RapReceivedChequeHoghughiDate varchar(10)='',
+    @Dat_RapReceivedChequeHoghughiDate2 varchar(10)='',
+    @Dat_RapReceivedChequeCancelDate varchar(10)='',
+    @Dat_RapReceivedChequeCancelDate2 varchar(10)='',
+    @Dat_EsterdadToPer varchar(10)='',
+    @Dat_EsterdadToPer2 varchar(10)='',
+    @Dat_EsterdadToCashier varchar(10)='',
+    @Dat_EsterdadToCashier2 varchar(10)='',
+    @Dat_RapReceivedChequeToAgainDate varchar(10)='',
+    @Dat_RapReceivedChequeToAgainDate2 varchar(10)='',
+    @Sta_ChekRecieptMainOrNot SmallInt=0,
+    @Sta_RapReceivedChequeState varchar(500)='1',
+    @SiCheks varchar(8000)='',
+    @StaDateFilter SmallInt=0,
+    @SiUser numeric=1,
+    @SiToPer varchar(1000)='',
+    @SiRelatedPer varchar(1000)='',
+    @SayadiRegistered char(1)='0',
+    @NotSayadiRegistered char(1)='0',
+    @IsElectronic char(1)='0',
+	@StaSumPers smallint=0
+)
+as
+
+declare    
+    @SayadiSql varchar(1000)
+
+-- صیادی ثبت شده: مقدار معتبر و بزرگتر از صفر داشته باشد
+if @SayadiRegistered='1' and @NotSayadiRegistered = '0'
+    Set @SayadiSql = 'AND (ISNULL(NULLIF(LTRIM(RTRIM(cheks1.Des_ReceivedChequeSayadiNationalCode)), ''''), ''0'') > ''0'')'
+
+-- صیادی ثبت نشده: مقدار خالی، NULL یا صفر باشد
+if @SayadiRegistered='0' and @NotSayadiRegistered = '1'
+    Set @SayadiSql = 'AND (ISNULL(NULLIF(LTRIM(RTRIM(cheks1.Des_ReceivedChequeSayadiNationalCode)), ''''), ''0'') = ''0'')'
+
+    if @SayadiRegistered='1' and @NotSayadiRegistered = '1'
+        Set @SayadiSql = ''
+
+    if @SayadiRegistered='0' and @NotSayadiRegistered = '0'
+        Set @SayadiSql = ''
+
+    if @IsElectronic='1' 
+        Set @SayadiSql = 'AND (isnull(cheks1.Sta_IsChecqueElectronic,''0'')=''1'')'
+
+if @GhabzNo=''
+Begin
+	Declare
+		@SqlText varchar(8000),
+		@Whr varchar(8000)
+	
+	-- Check if aggregation is needed
+	IF @StaSumPers = 1
+	BEGIN
+		Set @SqlText =
+		'SELECT 
+			CAST(NULL AS varchar(50)) AS GhabzNo,
+			CAST(NULL AS varchar(200)) AS BankName,
+			cheks1.GiverCode,
+			cheks1.GiverName,
+			CAST(NULL AS varchar(1)) AS RecieverCode,
+			CAST(NULL AS varchar(1)) AS RecieverName,
+			CAST(NULL AS varchar(10)) AS RegDate,
+			CAST(NULL AS varchar(10)) AS UsanceDate,
+			SUM(cheks1.ChequeAmount) AS ChequeAmount,
+			CAST(NULL AS varchar(50)) AS BankBranchCode,
+			CAST(NULL AS varchar(50)) AS ChequeSerial,
+			CAST(NULL AS varchar(500)) AS Tozihat,
+			CAST(NULL AS varchar(1500)) AS RecieptTozih,
+			CAST(NULL AS smallint) AS Sta_ChekRecieptMainOrNot,
+			CAST(NULL AS numeric(18,0)) AS SiRapReceivedCheque,
+			CAST(NULL AS varchar(50)) AS ContractNo,
+			CAST(NULL AS numeric(18,0)) AS SiPubPersonsSpec,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeCngDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeVosoolDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeBargashtDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeCancelDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToPerDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToBankDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeHoghughiDate,
+			CAST(NULL AS numeric(18,0)) AS SiPubSubLocations,
+			CAST(NULL AS smallint) AS Sta_RapReceivedChequeState,
+			CAST(NULL AS numeric(18,0)) AS SiRapCashDefine,
+			CAST(NULL AS numeric(18,0)) AS SiPubCustomCodes,
+			CAST(NULL AS varchar(50)) AS Cod_PubPersonCode,
+			CAST(NULL AS varchar(401)) AS Des_FullName,
+			CAST(NULL AS varchar(50)) AS GirandehCode,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToAgainDate,
+			CAST(NULL AS varchar(50)) AS Dat_EsterdadToPer,
+			CAST(NULL AS varchar(50)) AS Dat_EsterdadToCashier,
+			CAST(NULL AS varchar(401)) AS GirandehDesc,
+			CAST(NULL AS varchar(50)) AS Des_ReceivedChequeSayadiCode,
+			CAST(NULL AS varchar(50)) AS Des_ReceivedChequeSayadiNationalCode,
+			CAST(NULL AS smallint) AS Sta_IsChecqueElectronic
+		FROM         
+			Tss_RapRecCheckGhabzRep1Vw cheks1 LEFT OUTER JOIN
+			Tss_RapRecCheckGhabzRep2Vw cheks2 ON cheks1.SiRapReceivedCheque = cheks2.SiRapReceivedCheque
+		'
+	END
+	ELSE
+	BEGIN
+		Set @SqlText =
+		'select * from (SELECT   distinct  
+			cheks1.GhabzNo, 
+			cheks1.BankName, 
+			cheks1.GiverCode, 
+			cheks1.GiverName, 
+			'''' RecieverCode, 
+			'''' RecieverName, 
+			cheks1.RegDate, 
+			cheks1.UsanceDate, 
+			cheks1.ChequeAmount, 
+			cheks1.BankBranchCode, 
+			cheks1.ChequeSerial, 
+			cheks1.Tozihat, 
+			cheks1.RecieptTozih, 
+			cheks1.Sta_ChekRecieptMainOrNot, 
+			cheks1.SiRapReceivedCheque, 
+			cheks2.Cod_SaleAgreement AS ContractNo, 
+			cheks1.SiPubPersonsSpec, 
+			cheks1.Dat_RapReceivedChequeCngDate, 
+			cheks1.Dat_RapReceivedChequeVosoolDate, 
+			cheks1.Dat_RapReceivedChequeBargashtDate, 
+			cheks1.Dat_RapReceivedChequeCancelDate, 
+			cheks1.Dat_RapReceivedChequeToPerDate, 
+			cheks1.Dat_RapReceivedChequeToBankDate, 
+			cheks1.Dat_RapReceivedChequeHoghughiDate,
+			cheks1.SiPubSubLocations, 
+			cheks1.Sta_RapReceivedChequeState, 
+			cheks1.SiRapCashDefine, 
+			cheks1.SiPubCustomCodes, 
+			cheks1.Cod_PubPersonCode, 
+			cheks1.Des_FullName, 
+			cheks1.GirandehCode, 
+			cheks1.Dat_RapReceivedChequeToAgainDate, 
+			cheks1.Dat_EsterdadToPer, 
+			cheks1.Dat_EsterdadToCashier, 
+			cheks1.GirandehDesc,
+			cheks1.Des_ReceivedChequeSayadiCode,
+			cheks1.Des_ReceivedChequeSayadiNationalCode,
+			cheks1.Sta_IsChecqueElectronic
+		FROM         
+			Tss_RapRecCheckGhabzRep1Vw cheks1 LEFT OUTER JOIN
+			Tss_RapRecCheckGhabzRep2Vw cheks2 ON cheks1.SiRapReceivedCheque = cheks2.SiRapReceivedCheque
+		'
+	END
+
+	Set @Whr = ''
+
+	if isnull(@SiPubSubLocations,0)<>0	
+	Begin
+		Set @Whr = ' WHERE     
+				     (cheks1.SiPubSubLocations = '+convert(varchar,@SiPubSubLocations)+') '
+		if isnull(@SiPubPersonsSpec,0)<>0 
+		Set @Whr = @Whr + ' AND  (cheks1.SiPubPersonsSpec = '+convert(varchar,@SiPubPersonsSpec)+') '
+	End	 
+	Else
+	Begin
+		if isnull(@SiPubPersonsSpec,0)<>0 
+			Set @Whr = @Whr + ' Where  (cheks1.SiPubPersonsSpec = '+convert(varchar,@SiPubPersonsSpec)+') '
+		Else
+			Set @Whr = @Whr + ' Where '
+	End
+
+	if @SiToPer<>''
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+		Set @Whr = @Whr + ' AND (cheks1.SiRapReceivedCheque in (SELECT SiRapReceivedCheque FROM Tss_RapRecChequeToBank WHERE (SiPubPersonsSpec IN (SELECT Sisel FROM dbo.Tss_StdStringSiFindUdf('+''''+@SiToPer+''''+')))))'
+	Else
+		Set @Whr = @Whr + ' (cheks1.SiRapReceivedCheque in (SELECT SiRapReceivedCheque FROM Tss_RapRecChequeToBank WHERE (SiPubPersonsSpec IN (SELECT Sisel FROM dbo.Tss_StdStringSiFindUdf('+''''+@SiToPer+''''+')))))'
+	End
+
+	if @SiRelatedPer<>''
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+		Set @Whr = @Whr + ' AND (cheks1.SiPerRelatedSaler in  (SELECT Sisel FROM dbo.Tss_StdStringSiFindUdf('+''''+@SiRelatedPer+''''+')))'
+	Else
+		Set @Whr = @Whr + ' (cheks1.SiPerRelatedSaler in  (SELECT Sisel FROM dbo.Tss_StdStringSiFindUdf('+''''+@SiRelatedPer+''''+')))'
+	End
+
+	if (@Sta_RapReceivedChequeState<>'') and (@Sta_RapReceivedChequeState<>'1')
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+		Set @Whr = @Whr + ' AND (cheks1.Sta_RapReceivedChequeState in (Select Sisel from dbo.Tss_StdStringSiFindUdf('+''''+@Sta_RapReceivedChequeState+''''+')))'
+	Else
+		Set @Whr = @Whr + '  (cheks1.Sta_RapReceivedChequeState in (Select Sisel from dbo.Tss_StdStringSiFindUdf('+''''+@Sta_RapReceivedChequeState+''''+')))'
+	End
+	else
+
+IF (@Sta_RapReceivedChequeState = '1')
+BEGIN
+    DECLARE @Condition NVARCHAR(MAX)
+
+    SET @Condition = 
+        'cheks1.RegDate BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''' ' +
+        'AND (' +
+            '(ISNULL(cheks1.Dat_RapReceivedChequeToPerDate, '''') <> '''' AND ' +
+             'cheks1.Dat_RapReceivedChequeToPerDate NOT BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''') ' +
+            'OR ' +
+            '(ISNULL(cheks1.Dat_RapReceivedChequeToBankDate, '''') <> '''' AND ' +
+             'cheks1.Dat_RapReceivedChequeToBankDate NOT BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''') ' +
+            'OR ' +
+            '(ISNULL(cheks1.Dat_RapReceivedChequeBargashtDate, '''') BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''') ' +
+            'OR ' +
+            '(ISNULL(cheks1.Dat_RapReceivedChequeToAgainDate, '''') BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''')' +
+        ')'
+
+    IF ISNULL(@Whr, '') <> ' Where '
+        SET @Whr = @Whr + ' AND ' + @Condition
+    ELSE
+        SET @Whr = ' Where ' + @Condition
+END
+
+	if @SiCheks<>''
+		Set @Whr = @Whr + ' AND (cheks1.SiRapReceivedCheque in (Select SiSel From dbo.Tss_StdStringSiFindUdf('+''''+@SiCheks+''''+')))'
+
+	if @StaDateFilter=0
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.RegDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.RegDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=1
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.UsanceDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.UsanceDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=2
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeVosoolDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeVosoolDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=3
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeBargashtDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeBargashtDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=4
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeToPerDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeToPerDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=5
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeToBankDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeToBankDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=6
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeToAgainDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeToAgainDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=7
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.Dat_EsterdadToPer BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.Dat_EsterdadToPer BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=8
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.Dat_EsterdadToCashier BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.Dat_EsterdadToCashier BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+    if @SayadiSql <> ''
+        Set @Whr = @Whr + @SayadiSql
+
+	-- Handle ORDER BY for aggregation
+	IF @StaSumPers = 1
+	BEGIN
+		-- Add GROUP BY for GiverCode and GiverName
+		Set @SqlText = @SqlText + @Whr + ' GROUP BY cheks1.GiverCode, cheks1.GiverName ORDER BY cheks1.GiverName'
+	END
+	ELSE
+	BEGIN
+		if @Sta_ChekRecieptMainOrNot = 0	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by UsanceDate'
+		
+		if @Sta_ChekRecieptMainOrNot = 1	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeVosoolDate'
+
+		if @Sta_ChekRecieptMainOrNot = 2	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeBargashtDate'
+
+		if @Sta_ChekRecieptMainOrNot = 3	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeToPerDate'
+
+		if @Sta_ChekRecieptMainOrNot = 4	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeToBankDate'
+
+		if @Sta_ChekRecieptMainOrNot = 5	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeToAgainDate'
+
+		if @Sta_ChekRecieptMainOrNot = 6	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_EsterdadToPer'
+
+		if @Sta_ChekRecieptMainOrNot = 7	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_EsterdadToCashier'
+
+		if @Sta_ChekRecieptMainOrNot = 8	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by RegDate'
+	END
+
+    if @SayadiSql <> ''
+        
+if @Whr<>''
+	Set @Whr = @Whr + ' and  (SiPubSubLocations in  (SELECT DISTINCT 
+		Tss_AccFinancePeriodToPlace.SiPubSubLocations
+	FROM         
+		Tss_AccUserToFinancePeriodAndPlace INNER JOIN
+		Tss_AccFinancePeriodToPlace ON 
+		Tss_AccUserToFinancePeriodAndPlace.SiAccFinancePeriodToPlace = Tss_AccFinancePeriodToPlace.SiAccFinancePeriodToPlace
+	WHERE     
+		(Tss_AccUserToFinancePeriodAndPlace.SiPubPersonsSpec = '+convert(varchar,@SiUser)+')))'
+else
+	Set @Whr = @Whr + ' where  (SiPubSubLocations in  (SELECT DISTINCT 
+		Tss_AccFinancePeriodToPlace.SiPubSubLocations
+	FROM         
+		Tss_AccUserToFinancePeriodAndPlace INNER JOIN
+		Tss_AccFinancePeriodToPlace ON 
+		Tss_AccUserToFinancePeriodAndPlace.SiAccFinancePeriodToPlace = Tss_AccFinancePeriodToPlace.SiAccFinancePeriodToPlace
+	WHERE     
+		(Tss_AccUserToFinancePeriodAndPlace.SiPubPersonsSpec = @'+convert(varchar,@SiUser)+')))'
+		
+	print @SqlText
+	
+	exec(@SqlText)
+End
+Else
+Begin
+	-- Handle the ELSE block when @GhabzNo is not empty
+	IF @StaSumPers = 1
+	BEGIN
+		SELECT 
+			CAST(NULL AS varchar(50)) AS GhabzNo,
+			CAST(NULL AS varchar(200)) AS BankName,
+			cheks1.GiverCode,
+			cheks1.GiverName,
+			CAST(NULL AS varchar(1)) AS RecieverCode,
+			CAST(NULL AS varchar(1)) AS RecieverName,
+			CAST(NULL AS varchar(10)) AS RegDate,
+			CAST(NULL AS varchar(10)) AS UsanceDate,
+			SUM(cheks1.ChequeAmount) AS ChequeAmount,
+			CAST(NULL AS varchar(50)) AS BankBranchCode,
+			CAST(NULL AS varchar(50)) AS ChequeSerial,
+			CAST(NULL AS varchar(500)) AS Tozihat,
+			CAST(NULL AS varchar(1500)) AS RecieptTozih,
+			CAST(NULL AS smallint) AS Sta_ChekRecieptMainOrNot,
+			CAST(NULL AS numeric(18,0)) AS SiRapReceivedCheque,
+			CAST(NULL AS varchar(50)) AS ContractNo,
+			CAST(NULL AS numeric(18,0)) AS SiPubPersonsSpec,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeCngDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeVosoolDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeBargashtDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeCancelDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToPerDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToBankDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeHoghughiDate,
+			CAST(NULL AS numeric(18,0)) AS SiPubSubLocations,
+			CAST(NULL AS smallint) AS Sta_RapReceivedChequeState,
+			CAST(NULL AS numeric(18,0)) AS SiRapCashDefine,
+			CAST(NULL AS numeric(18,0)) AS SiPubCustomCodes,
+			CAST(NULL AS varchar(50)) AS Cod_PubPersonCode,
+			CAST(NULL AS varchar(401)) AS Des_FullName,
+			CAST(NULL AS varchar(50)) AS GirandehCode,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToAgainDate,
+			CAST(NULL AS varchar(50)) AS Dat_EsterdadToPer,
+			CAST(NULL AS varchar(50)) AS Dat_EsterdadToCashier,
+			CAST(NULL AS varchar(401)) AS GirandehDesc,
+			CAST(NULL AS varchar(50)) AS Des_ReceivedChequeSayadiCode,
+			CAST(NULL AS varchar(50)) AS Des_ReceivedChequeSayadiNationalCode,
+			CAST(NULL AS smallint) AS Sta_IsChecqueElectronic
+		FROM         
+			Tss_RapRecCheckGhabzRep1Vw cheks1 LEFT OUTER JOIN
+			Tss_RapRecCheckGhabzRep2Vw cheks2 ON cheks1.SiRapReceivedCheque = cheks2.SiRapReceivedCheque
+		WHERE   
+			(cheks1.Sta_CheckToBankState <> 4) and
+			(cheks1.Sta_CheckToBankState <> 3) and 	
+			(cheks1.GhabzNo = @GhabzNo) and
+			(cheks1.Sta_ChekRecieptMainOrNot = @Sta_ChekRecieptMainOrNot )
+		GROUP BY cheks1.GiverCode, cheks1.GiverName
+		ORDER BY cheks1.GiverName
+	END
+	ELSE
+	BEGIN
+		SELECT    distinct 
+			cheks1.GhabzNo, 
+			cheks1.BankName, 
+			'' GiverCode, 
+			'' GiverName, 
+			cheks1.RecieverCode, 
+			cheks1.RecieverName, 
+			cheks1.RegDate, 
+			cheks1.UsanceDate, 
+			cheks1.ChequeAmount, 
+			cheks1.BankBranchCode, 
+			cheks1.ChequeSerial, 
+			cheks1.Tozihat, 
+			cheks1.RecieptTozih, 
+			cheks1.Sta_ChekRecieptMainOrNot, 
+			cheks1.SiRapReceivedCheque, 
+			cheks2.Cod_SaleAgreement AS ContractNo, 
+			cheks1.SiPubPersonsSpec, 
+			cheks1.Dat_RapReceivedChequeCngDate, 
+			cheks1.Dat_RapReceivedChequeVosoolDate, 
+			cheks1.Dat_RapReceivedChequeBargashtDate, 
+			cheks1.Dat_RapReceivedChequeCancelDate, 
+			cheks1.Dat_RapReceivedChequeToPerDate, 
+			cheks1.Dat_RapReceivedChequeToBankDate, 
+			cheks1.Dat_RapReceivedChequeHoghughiDate, 
+			cheks1.SiPubSubLocations, 
+			cheks1.Sta_RapReceivedChequeState, 
+			cheks1.SiRapCashDefine, 
+			cheks1.SiPubCustomCodes, 
+			cheks1.Cod_PubPersonCode, 
+			cheks1.Des_FullName,
+			cheks1.GirandehCode, 
+			cheks1.GirandehDesc,
+			cheks1.Dat_EsterdadToCashier,
+			cheks1.Dat_EsterdadToPer,
+			cheks1.Des_ReceivedChequeSayadiCode,
+			cheks1.Des_ReceivedChequeSayadiNationalCode,
+			cheks1.Dat_RapReceivedChequeToAgainDate,
+			cheks1.Sta_IsChecqueElectronic
+		FROM         
+			Tss_RapRecCheckGhabzRep1Vw cheks1 LEFT OUTER JOIN
+			Tss_RapRecCheckGhabzRep2Vw cheks2 ON cheks1.SiRapReceivedCheque = cheks2.SiRapReceivedCheque
+		WHERE   
+			(cheks1.Sta_CheckToBankState <> 4) and
+			(cheks1.Sta_CheckToBankState <> 3) and 	
+			(cheks1.GhabzNo = @GhabzNo) and
+			(cheks1.Sta_ChekRecieptMainOrNot = @Sta_ChekRecieptMainOrNot )
+	END
+End
+
+
+GO
+
+alter proc Tss_RapFrmRecievedChequeRepRStpAll
+(
+    @SiPubSubLocations numeric=0,
+    @SiRapCashDefine numeric=0,
+    @SiPubPersonsSpec numeric=0,
+    @GhabzNo varchar(50)='',
+    @RegDate varchar(10)='1404/01/01',
+    @RegDate2 varchar(10)='1404/12/29',
+    @UsanceDate varchar(10)='',
+    @UsanceDate2 varchar(10)='',
+    @Dat_RapReceivedChequeVosoolDate varchar(10)='',
+    @Dat_RapReceivedChequeVosoolDate2 varchar(10)='',
+    @Dat_RapReceivedChequeBargashtDate varchar(10)='',
+    @Dat_RapReceivedChequeBargashtDate2 varchar(10)='',
+    @Dat_RapReceivedChequeToPerDate varchar(10)='',
+    @Dat_RapReceivedChequeToPerDate2 varchar(10)='',
+    @Dat_RapReceivedChequeToBankDate varchar(10)='',
+    @Dat_RapReceivedChequeToBankDate2 varchar(10)='',
+    @Dat_RapReceivedChequeHoghughiDate varchar(10)='',
+    @Dat_RapReceivedChequeHoghughiDate2 varchar(10)='',
+    @Dat_RapReceivedChequeCancelDate varchar(10)='',
+    @Dat_RapReceivedChequeCancelDate2 varchar(10)='',
+    @Dat_EsterdadToPer varchar(10)='',
+    @Dat_EsterdadToPer2 varchar(10)='',
+    @Dat_EsterdadToCashier varchar(10)='',
+    @Dat_EsterdadToCashier2 varchar(10)='',
+    @Dat_RapReceivedChequeToAgainDate varchar(10)='',
+    @Dat_RapReceivedChequeToAgainDate2 varchar(10)='',
+    @Sta_ChekRecieptMainOrNot SmallInt=0,
+    @Sta_RapReceivedChequeState varchar(500)='1',
+    @SiCheks varchar(8000)='',
+    @StaDateFilter SmallInt=0,
+    @SiUser numeric=1,
+    @SiToPer varchar(1000)='',
+    @SiRelatedPer varchar(1000)='',
+    @SayadiRegistered char(1)='0',
+    @NotSayadiRegistered char(1)='0',
+    @IsElectronic char(1)='0',
+	@IsSayadiInCartable char(1)='0',
+	@NotSayadiInCartable char(1)='0',
+	@StaSumPers smallint=0
+)
+as
+
+declare    
+    @SayadiSql varchar(1000)
+
+-- صیادی ثبت شده: مقدار معتبر و بزرگتر از صفر داشته باشد
+if @SayadiRegistered='1' and @NotSayadiRegistered = '0'
+    Set @SayadiSql = 'AND (ISNULL(NULLIF(LTRIM(RTRIM(cheks1.Des_ReceivedChequeSayadiNationalCode)), ''''), ''0'') > ''0'')'
+
+-- صیادی ثبت نشده: مقدار خالی، NULL یا صفر باشد
+if @SayadiRegistered='0' and @NotSayadiRegistered = '1'
+    Set @SayadiSql = 'AND (ISNULL(NULLIF(LTRIM(RTRIM(cheks1.Des_ReceivedChequeSayadiNationalCode)), ''''), ''0'') = ''0'')'
+
+if @SayadiRegistered='1' and @NotSayadiRegistered = '1'
+    Set @SayadiSql = ''
+
+if @SayadiRegistered='0' and @NotSayadiRegistered = '0'
+    Set @SayadiSql = ''
+
+if @IsElectronic='1' 
+    Set @SayadiSql = 'AND (isnull(cheks1.Sta_IsChecqueElectronic,''0'')=''1'')'
+
+
+if @IsSayadiInCartable='1' 
+    Set @SayadiSql = 'AND (isnull(cheks1.Sta_SayadiReg,''0'')=''1'')'
+
+
+if @NotSayadiInCartable='1' 
+    Set @SayadiSql = 'AND (isnull(cheks1.Sta_IsChecqueElectronic,''0'')=''1'')'
+
+if @GhabzNo=''
+Begin
+	Declare
+		@SqlText varchar(8000),
+		@Whr varchar(8000)
+	
+	-- Check if aggregation is needed
+	IF @StaSumPers = 1
+	BEGIN
+		Set @SqlText =
+		'SELECT 
+			CAST(NULL AS varchar(50)) AS GhabzNo,
+			CAST(NULL AS varchar(200)) AS BankName,
+			cheks1.GiverCode,
+			cheks1.GiverName,
+			CAST(NULL AS varchar(1)) AS RecieverCode,
+			CAST(NULL AS varchar(1)) AS RecieverName,
+			CAST(NULL AS varchar(10)) AS RegDate,
+			CAST(NULL AS varchar(10)) AS UsanceDate,
+			SUM(cheks1.ChequeAmount) AS ChequeAmount,
+			CAST(NULL AS varchar(50)) AS BankBranchCode,
+			CAST(NULL AS varchar(50)) AS ChequeSerial,
+			CAST(NULL AS varchar(500)) AS Tozihat,
+			CAST(NULL AS varchar(1500)) AS RecieptTozih,
+			CAST(NULL AS smallint) AS Sta_ChekRecieptMainOrNot,
+			CAST(NULL AS numeric(18,0)) AS SiRapReceivedCheque,
+			CAST(NULL AS varchar(50)) AS ContractNo,
+			CAST(NULL AS numeric(18,0)) AS SiPubPersonsSpec,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeCngDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeVosoolDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeBargashtDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeCancelDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToPerDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToBankDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeHoghughiDate,
+			CAST(NULL AS numeric(18,0)) AS SiPubSubLocations,
+			CAST(NULL AS smallint) AS Sta_RapReceivedChequeState,
+			CAST(NULL AS numeric(18,0)) AS SiRapCashDefine,
+			CAST(NULL AS numeric(18,0)) AS SiPubCustomCodes,
+			CAST(NULL AS varchar(50)) AS Cod_PubPersonCode,
+			CAST(NULL AS varchar(401)) AS Des_FullName,
+			CAST(NULL AS varchar(50)) AS GirandehCode,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToAgainDate,
+			CAST(NULL AS varchar(50)) AS Dat_EsterdadToPer,
+			CAST(NULL AS varchar(50)) AS Dat_EsterdadToCashier,
+			CAST(NULL AS varchar(401)) AS GirandehDesc,
+			CAST(NULL AS varchar(50)) AS Des_ReceivedChequeSayadiCode,
+			CAST(NULL AS varchar(50)) AS Des_ReceivedChequeSayadiNationalCode,
+			CAST(NULL AS smallint) AS Sta_IsChecqueElectronic
+		FROM         
+			Tss_RapRecCheckGhabzRep1Vw cheks1 LEFT OUTER JOIN
+			Tss_RapRecCheckGhabzRep2Vw cheks2 ON cheks1.SiRapReceivedCheque = cheks2.SiRapReceivedCheque
+		'
+	END
+	ELSE
+	BEGIN
+		Set @SqlText =
+		'select * from (SELECT   distinct  
+			cheks1.GhabzNo, 
+			cheks1.BankName, 
+			cheks1.GiverCode, 
+			cheks1.GiverName, 
+			'''' RecieverCode, 
+			'''' RecieverName, 
+			cheks1.RegDate, 
+			cheks1.UsanceDate, 
+			cheks1.ChequeAmount, 
+			cheks1.BankBranchCode, 
+			cheks1.ChequeSerial, 
+			cheks1.Tozihat, 
+			cheks1.RecieptTozih, 
+			cheks1.Sta_ChekRecieptMainOrNot, 
+			cheks1.SiRapReceivedCheque, 
+			cheks2.Cod_SaleAgreement AS ContractNo, 
+			cheks1.SiPubPersonsSpec, 
+			cheks1.Dat_RapReceivedChequeCngDate, 
+			cheks1.Dat_RapReceivedChequeVosoolDate, 
+			cheks1.Dat_RapReceivedChequeBargashtDate, 
+			cheks1.Dat_RapReceivedChequeCancelDate, 
+			cheks1.Dat_RapReceivedChequeToPerDate, 
+			cheks1.Dat_RapReceivedChequeToBankDate, 
+			cheks1.Dat_RapReceivedChequeHoghughiDate,
+			cheks1.SiPubSubLocations, 
+			cheks1.Sta_RapReceivedChequeState, 
+			cheks1.SiRapCashDefine, 
+			cheks1.SiPubCustomCodes, 
+			cheks1.Cod_PubPersonCode, 
+			cheks1.Des_FullName, 
+			cheks1.GirandehCode, 
+			cheks1.Dat_RapReceivedChequeToAgainDate, 
+			cheks1.Dat_EsterdadToPer, 
+			cheks1.Dat_EsterdadToCashier, 
+			cheks1.GirandehDesc,
+			cheks1.Des_ReceivedChequeSayadiCode,
+			cheks1.Des_ReceivedChequeSayadiNationalCode,
+			cheks1.Sta_IsChecqueElectronic
+		FROM         
+			Tss_RapRecCheckGhabzRep1Vw cheks1 LEFT OUTER JOIN
+			Tss_RapRecCheckGhabzRep2Vw cheks2 ON cheks1.SiRapReceivedCheque = cheks2.SiRapReceivedCheque
+		'
+	END
+
+	Set @Whr = ''
+
+	if isnull(@SiPubSubLocations,0)<>0	
+	Begin
+		Set @Whr = ' WHERE     
+				     (cheks1.SiPubSubLocations = '+convert(varchar,@SiPubSubLocations)+') '
+		if isnull(@SiPubPersonsSpec,0)<>0 
+		Set @Whr = @Whr + ' AND  (cheks1.SiPubPersonsSpec = '+convert(varchar,@SiPubPersonsSpec)+') '
+	End	 
+	Else
+	Begin
+		if isnull(@SiPubPersonsSpec,0)<>0 
+			Set @Whr = @Whr + ' Where  (cheks1.SiPubPersonsSpec = '+convert(varchar,@SiPubPersonsSpec)+') '
+		Else
+			Set @Whr = @Whr + ' Where '
+	End
+
+	if @SiToPer<>''
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+		Set @Whr = @Whr + ' AND (cheks1.SiRapReceivedCheque in (SELECT SiRapReceivedCheque FROM Tss_RapRecChequeToBank WHERE (SiPubPersonsSpec IN (SELECT Sisel FROM dbo.Tss_StdStringSiFindUdf('+''''+@SiToPer+''''+')))))'
+	Else
+		Set @Whr = @Whr + ' (cheks1.SiRapReceivedCheque in (SELECT SiRapReceivedCheque FROM Tss_RapRecChequeToBank WHERE (SiPubPersonsSpec IN (SELECT Sisel FROM dbo.Tss_StdStringSiFindUdf('+''''+@SiToPer+''''+')))))'
+	End
+
+	if @SiRelatedPer<>''
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+		Set @Whr = @Whr + ' AND (cheks1.SiPerRelatedSaler in  (SELECT Sisel FROM dbo.Tss_StdStringSiFindUdf('+''''+@SiRelatedPer+''''+')))'
+	Else
+		Set @Whr = @Whr + ' (cheks1.SiPerRelatedSaler in  (SELECT Sisel FROM dbo.Tss_StdStringSiFindUdf('+''''+@SiRelatedPer+''''+')))'
+	End
+
+	if (@Sta_RapReceivedChequeState<>'') and (@Sta_RapReceivedChequeState<>'1')
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+		Set @Whr = @Whr + ' AND (cheks1.Sta_RapReceivedChequeState in (Select Sisel from dbo.Tss_StdStringSiFindUdf('+''''+@Sta_RapReceivedChequeState+''''+')))'
+	Else
+		Set @Whr = @Whr + ' (cheks1.Sta_RapReceivedChequeState in (Select Sisel from dbo.Tss_StdStringSiFindUdf('+''''+@Sta_RapReceivedChequeState+''''+')))'
+	End
+	else
+
+IF (@Sta_RapReceivedChequeState = '1')
+BEGIN
+    DECLARE @Condition NVARCHAR(MAX)
+
+    SET @Condition = 
+        'cheks1.RegDate BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''' ' +
+        'AND (' +
+            '(ISNULL(cheks1.Dat_RapReceivedChequeToPerDate, '''') <> '''' AND ' +
+             'cheks1.Dat_RapReceivedChequeToPerDate NOT BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''') ' +
+            'OR ' +
+            '(ISNULL(cheks1.Dat_RapReceivedChequeToBankDate, '''') <> '''' AND ' +
+             'cheks1.Dat_RapReceivedChequeToBankDate NOT BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''') ' +
+            'OR ' +
+            '(ISNULL(cheks1.Dat_RapReceivedChequeBargashtDate, '''') BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''') ' +
+            'OR ' +
+            '(ISNULL(cheks1.Dat_RapReceivedChequeToAgainDate, '''') BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''')' +
+        ')'
+
+    IF ISNULL(@Whr, '') <> ' Where '
+        SET @Whr = @Whr + ' AND ' + @Condition
+    ELSE
+        SET @Whr = ' Where ' + @Condition
+END
+
+	if @SiCheks<>''
+		Set @Whr = @Whr + ' AND (cheks1.SiRapReceivedCheque in (Select SiSel From dbo.Tss_StdStringSiFindUdf('+''''+@SiCheks+''''+')))'
+
+	if @StaDateFilter=0
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.RegDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.RegDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=1
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.UsanceDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.UsanceDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=2
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeVosoolDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeVosoolDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=3
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeBargashtDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeBargashtDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=4
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeToPerDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeToPerDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=5
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeToBankDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeToBankDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=6
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeToAgainDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeToAgainDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=7
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.Dat_EsterdadToPer BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.Dat_EsterdadToPer BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+	if @StaDateFilter=8
+	Begin
+	if isnull(@Whr,'') <> ' Where '
+					Set @Whr = @Whr + ' AND (cheks1.Dat_EsterdadToCashier BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+			Else
+					Set @Whr = @Whr + ' (cheks1.Dat_EsterdadToCashier BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
+	End
+
+    if @SayadiSql <> ''
+        Set @Whr = @Whr + @SayadiSql
+
+	-- Handle ORDER BY for aggregation
+	IF @StaSumPers = 1
+	BEGIN
+		-- Add GROUP BY for GiverCode and GiverName
+		Set @SqlText = @SqlText + @Whr + ' GROUP BY cheks1.GiverCode, cheks1.GiverName ORDER BY cheks1.GiverName'
+	END
+	ELSE
+	BEGIN
+		if @Sta_ChekRecieptMainOrNot = 0	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by UsanceDate'
+		
+		if @Sta_ChekRecieptMainOrNot = 1	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeVosoolDate'
+
+		if @Sta_ChekRecieptMainOrNot = 2	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeBargashtDate'
+
+		if @Sta_ChekRecieptMainOrNot = 3	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeToPerDate'
+
+		if @Sta_ChekRecieptMainOrNot = 4	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeToBankDate'
+
+		if @Sta_ChekRecieptMainOrNot = 5	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeToAgainDate'
+
+		if @Sta_ChekRecieptMainOrNot = 6	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_EsterdadToPer'
+
+		if @Sta_ChekRecieptMainOrNot = 7	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_EsterdadToCashier'
+
+		if @Sta_ChekRecieptMainOrNot = 8	
+			Set @SqlText = @SqlText + @Whr + ') ccc order by RegDate'
+	END
+
+    if @SayadiSql <> ''
+        
+if @Whr<>''
+	Set @Whr = @Whr + ' and  (SiPubSubLocations in  (SELECT DISTINCT 
+		Tss_AccFinancePeriodToPlace.SiPubSubLocations
+	FROM         
+		Tss_AccUserToFinancePeriodAndPlace INNER JOIN
+		Tss_AccFinancePeriodToPlace ON 
+		Tss_AccUserToFinancePeriodAndPlace.SiAccFinancePeriodToPlace = Tss_AccFinancePeriodToPlace.SiAccFinancePeriodToPlace
+	WHERE     
+		(Tss_AccUserToFinancePeriodAndPlace.SiPubPersonsSpec = '+convert(varchar,@SiUser)+')))'
+else
+	Set @Whr = @Whr + ' where  (SiPubSubLocations in  (SELECT DISTINCT 
+		Tss_AccFinancePeriodToPlace.SiPubSubLocations
+	FROM         
+		Tss_AccUserToFinancePeriodAndPlace INNER JOIN
+		Tss_AccFinancePeriodToPlace ON 
+		Tss_AccUserToFinancePeriodAndPlace.SiAccFinancePeriodToPlace = Tss_AccFinancePeriodToPlace.SiAccFinancePeriodToPlace
+	WHERE     
+		(Tss_AccUserToFinancePeriodAndPlace.SiPubPersonsSpec = @'+convert(varchar,@SiUser)+')))'
+		
+	print @SqlText
+	
+	exec(@SqlText)
+End
+Else
+Begin
+	-- Handle the ELSE block when @GhabzNo is not empty
+	IF @StaSumPers = 1
+	BEGIN
+		SELECT 
+			CAST(NULL AS varchar(50)) AS GhabzNo,
+			CAST(NULL AS varchar(200)) AS BankName,
+			cheks1.GiverCode,
+			cheks1.GiverName,
+			CAST(NULL AS varchar(1)) AS RecieverCode,
+			CAST(NULL AS varchar(1)) AS RecieverName,
+			CAST(NULL AS varchar(10)) AS RegDate,
+			CAST(NULL AS varchar(10)) AS UsanceDate,
+			SUM(cheks1.ChequeAmount) AS ChequeAmount,
+			CAST(NULL AS varchar(50)) AS BankBranchCode,
+			CAST(NULL AS varchar(50)) AS ChequeSerial,
+			CAST(NULL AS varchar(500)) AS Tozihat,
+			CAST(NULL AS varchar(1500)) AS RecieptTozih,
+			CAST(NULL AS smallint) AS Sta_ChekRecieptMainOrNot,
+			CAST(NULL AS numeric(18,0)) AS SiRapReceivedCheque,
+			CAST(NULL AS varchar(50)) AS ContractNo,
+			CAST(NULL AS numeric(18,0)) AS SiPubPersonsSpec,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeCngDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeVosoolDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeBargashtDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeCancelDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToPerDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToBankDate,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeHoghughiDate,
+			CAST(NULL AS numeric(18,0)) AS SiPubSubLocations,
+			CAST(NULL AS smallint) AS Sta_RapReceivedChequeState,
+			CAST(NULL AS numeric(18,0)) AS SiRapCashDefine,
+			CAST(NULL AS numeric(18,0)) AS SiPubCustomCodes,
+			CAST(NULL AS varchar(50)) AS Cod_PubPersonCode,
+			CAST(NULL AS varchar(401)) AS Des_FullName,
+			CAST(NULL AS varchar(50)) AS GirandehCode,
+			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToAgainDate,
+			CAST(NULL AS varchar(50)) AS Dat_EsterdadToPer,
+			CAST(NULL AS varchar(50)) AS Dat_EsterdadToCashier,
+			CAST(NULL AS varchar(401)) AS GirandehDesc,
+			CAST(NULL AS varchar(50)) AS Des_ReceivedChequeSayadiCode,
+			CAST(NULL AS varchar(50)) AS Des_ReceivedChequeSayadiNationalCode,
+			CAST(NULL AS smallint) AS Sta_IsChecqueElectronic
+		FROM         
+			Tss_RapRecCheckGhabzRep1Vw cheks1 LEFT OUTER JOIN
+			Tss_RapRecCheckGhabzRep2Vw cheks2 ON cheks1.SiRapReceivedCheque = cheks2.SiRapReceivedCheque
+		WHERE   
+			(cheks1.Sta_CheckToBankState <> 4) and
+			(cheks1.Sta_CheckToBankState <> 3) and 	
+			(cheks1.GhabzNo = @GhabzNo) and
+			(cheks1.Sta_ChekRecieptMainOrNot = @Sta_ChekRecieptMainOrNot )
+		GROUP BY cheks1.GiverCode, cheks1.GiverName
+		ORDER BY cheks1.GiverName
+	END
+	ELSE
+	BEGIN
+		SELECT    distinct 
+			cheks1.GhabzNo, 
+			cheks1.BankName, 
+			'' GiverCode, 
+			'' GiverName, 
+			cheks1.RecieverCode, 
+			cheks1.RecieverName, 
+			cheks1.RegDate, 
+			cheks1.UsanceDate, 
+			cheks1.ChequeAmount, 
+			cheks1.BankBranchCode, 
+			cheks1.ChequeSerial, 
+			cheks1.Tozihat, 
+			cheks1.RecieptTozih, 
+			cheks1.Sta_ChekRecieptMainOrNot, 
+			cheks1.SiRapReceivedCheque, 
+			cheks2.Cod_SaleAgreement AS ContractNo, 
+			cheks1.SiPubPersonsSpec, 
+			cheks1.Dat_RapReceivedChequeCngDate, 
+			cheks1.Dat_RapReceivedChequeVosoolDate, 
+			cheks1.Dat_RapReceivedChequeBargashtDate, 
+			cheks1.Dat_RapReceivedChequeCancelDate, 
+			cheks1.Dat_RapReceivedChequeToPerDate, 
+			cheks1.Dat_RapReceivedChequeToBankDate, 
+			cheks1.Dat_RapReceivedChequeHoghughiDate, 
+			cheks1.SiPubSubLocations, 
+			cheks1.Sta_RapReceivedChequeState, 
+			cheks1.SiRapCashDefine, 
+			cheks1.SiPubCustomCodes, 
+			cheks1.Cod_PubPersonCode, 
+			cheks1.Des_FullName,
+			cheks1.GirandehCode, 
+			cheks1.GirandehDesc,
+			cheks1.Dat_EsterdadToCashier,
+			cheks1.Dat_EsterdadToPer,
+			cheks1.Des_ReceivedChequeSayadiCode,
+			cheks1.Des_ReceivedChequeSayadiNationalCode,
+			cheks1.Dat_RapReceivedChequeToAgainDate,
+			cheks1.Sta_IsChecqueElectronic
+		FROM         
+			Tss_RapRecCheckGhabzRep1Vw cheks1 LEFT OUTER JOIN
+			Tss_RapRecCheckGhabzRep2Vw cheks2 ON cheks1.SiRapReceivedCheque = cheks2.SiRapReceivedCheque
+		WHERE   
+			(cheks1.Sta_CheckToBankState <> 4) and
+			(cheks1.Sta_CheckToBankState <> 3) and 	
+			(cheks1.GhabzNo = @GhabzNo) and
+			(cheks1.Sta_ChekRecieptMainOrNot = @Sta_ChekRecieptMainOrNot )
+	END
+End
