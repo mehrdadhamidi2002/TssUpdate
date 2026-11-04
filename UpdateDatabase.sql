@@ -5125,273 +5125,6 @@ Exec(@SqlTxt)
 
 GO
 
-alter PROCEDURE Tss_AccUntTafsiliReview_03VStp   
-(  
-    @InternalWhere VARCHAR(8000)='', 
-    @Where VARCHAR(8000)='', 
-    @Order VARCHAR(8000)='', 
-    @DsFromDate VARCHAR(10)='1399/01/01', 
-    @DsToDate VARCHAR(10)='1399/09/07', 
-    @SiAccFinancePeriod NUMERIC=20, 
-    @SiPubSubLocations VARCHAR(500)='1,2', 
-    @Sta_Start SMALLINT=0,
-    @Sta_End SMALLINT=0, 
-    @Sta_Close SMALLINT=0, 
-    @StaMandehOrNot SMALLINT=1, 
-    @SiAccCodeBook VARCHAR(50)='18,21', 
-    @SiSelected VARCHAR(50)='2160',
-    @SiUser NUMERIC=1
-)
-AS
-BEGIN
-    SET NOCOUNT ON
-    SET XACT_ABORT, ARITHABORT, CONCAT_NULL_YIELDS_NULL, ANSI_NULLS, ANSI_NULL_DFLT_ON, ANSI_PADDING, ANSI_WARNINGS, QUOTED_IDENTIFIER ON
-
-    -- Drop temp tables if exist
-    DROP TABLE IF EXISTS ##TmpVchTaf
-    DROP TABLE IF EXISTS ##TmpVchTafMandeh
-    DROP TABLE IF EXISTS ##TmpVchTafBaBiMandeh
-    DROP TABLE IF EXISTS #TempTable
-
-    -- Set conditions - handle NULL parameters
-    SET @InternalWhere = CASE WHEN @InternalWhere IS NOT NULL AND @InternalWhere<>'' THEN ' WHERE '+@InternalWhere ELSE '' END
-    SET @Where = CASE WHEN @Where IS NOT NULL AND @Where<>'' THEN ' WHERE '+@Where ELSE '' END
-    SET @Order = CASE WHEN @Order IS NOT NULL AND @Order<>'' THEN ' ORDER BY '+@Order ELSE '' END
-
-    DECLARE @WhType VARCHAR(300)=CASE 
-        WHEN @Sta_Start=0 THEN (SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=0) ELSE '' END
-        
-    SET @WhType = @WhType + CASE WHEN @Sta_End=0 AND @WhType<>'' THEN ',' ELSE '' END + 
-        CASE WHEN @Sta_End=0 THEN (SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=1) ELSE '' END
-        
-    SET @WhType = @WhType + CASE WHEN @Sta_Close=0 AND @WhType<>'' THEN ',' ELSE '' END + 
-        CASE WHEN @Sta_Close=0 THEN (SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=3) ELSE '' END
-        
-    SET @WhType = CASE WHEN @WhType<>'' THEN ' AND vHed.SiAccVoucherType NOT IN ('+@WhType+')' ELSE '' END
-
-    -- Get TafName
-    DECLARE @TafName VARCHAR(100)=CASE (SELECT TOP 1 Sta_TafType1 FROM Tss_AccCodeBook WHERE SiAccCodeBook=(SELECT TOP 1 SiSel FROM dbo.Tss_StdStringSiFindUdf(@SiAccCodeBook)))
-        WHEN 1 THEN 'SiPubPersonsSpec1' WHEN 2 THEN 'SiPubCostCenter1' WHEN 3 THEN 'SiPubProjects1' WHEN 4 THEN 'SiPurOrder_Hd1' END
-
-    DECLARE @AccAllDocs SMALLINT = dbo.Tss_StdFindSystemParamValue('AccAllDocs')
-    
-    -- AccStar hidden filter
-    DECLARE @HiddenFilter VARCHAR(500)
-    IF dbo.Tss_StdFindIfUserIsInGroup(@SiUser,'AccStar') = 1
-        SET @HiddenFilter = ''
-    ELSE
-        SET @HiddenFilter = ' AND (vDet.Sta_IsHidden = 0 OR vDet.Sta_IsHidden IS NULL) '
-    
-    -- Build temp table for period
-    SELECT SiAccFinancePeriodToPlace INTO #TempTable FROM dbo.Tss_AccFinancePeriodToPlace
-    WHERE SiPubSubLocations IN (SELECT * FROM dbo.Tss_StdStringSiFindUdf(@SiPubSubLocations))
-
-    -- Create ##TmpVchTaf explicitly with NVARCHAR(4000) for Des_VdetDesc
-    CREATE TABLE ##TmpVchTaf (
-        SiAccVoucher_Hd NUMERIC NULL,
-        Dat_VhedDate VARCHAR(10) NULL,
-        Num_VDetRow INT NULL,
-        Des_VdetDesc NVARCHAR(4000) NULL,  -- Changed to NVARCHAR(4000)
-        Num_VdetDebtAmount BIGINT NULL,
-        Num_VdetCreditAmount BIGINT NULL,
-        Num_VhedFinalNo DECIMAL(18,0) NULL,
-        Num_VhedSubNo INT NULL
-    )
-
-    -- Build main query with CAST for Des_VdetDesc
-    DECLARE @StatusFilter VARCHAR(100)=CASE WHEN @AccAllDocs=0 THEN 'vHed.Sta_VochStatus >= 3 AND vHed.Sta_VochStatus <> 5 AND ' ELSE 'vHed.Sta_VochStatus >= 3 AND ' END
-    
-    DECLARE @SqlTxt NVARCHAR(MAX)='
-    SELECT 
-        vHed.SiAccVoucher_Hd, 
-        vHed.Dat_VhedDate, 
-        vDet.Num_VDetRow,
-        Des_VdetDesc = CAST(CASE WHEN Tss_AccVoucherType.Sta_VoucherTypeGroup IN (4,5) 
-            THEN ISNULL(vDet.Des_VdetDesc,'''') 
-            ELSE vDet.Des_VdetDesc 
-        END AS NVARCHAR(4000)),  -- Cast to NVARCHAR(4000)
-        CAST(vDet.Num_VdetDebtAmount AS BIGINT) AS Num_VdetDebtAmount, 
-        CAST(vDet.Num_VdetCreditAmount AS BIGINT) AS Num_VdetCreditAmount, 
-        CAST(vHed.Num_VhedFinalNo AS DECIMAL(18,0)) AS Num_VhedFinalNo, 
-        CAST(vHed.Num_VhedSubNo AS INT) AS Num_VhedSubNo
-    FROM Tss_AccCodeBook cBook
-    INNER JOIN Tss_AccVoucher_Dt vDet ON cBook.SiAccCodeBook = vDet.SiAccCodeBook
-    INNER JOIN Tss_AccVoucher_Hd vHed ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd
-    INNER JOIN Tss_AccVoucherType ON vHed.SiAccVoucherType = Tss_AccVoucherType.SiAccVoucherType
-    WHERE ' + @StatusFilter + '
-        vHed.SiAccFinancePeriodToPlace IN (SELECT SiAccFinancePeriodToPlace FROM #TempTable)
-        AND vHed.Dat_VhedDate BETWEEN ''' + @DsFromDate + ''' AND ''' + @DsToDate + '''
-        AND cBook.SiAccCodeBook IN (SELECT SiSel FROM dbo.Tss_StdStringSiFindUdf(''' + @SiAccCodeBook + '''))
-        AND vDet.' + @TafName + ' = ' + @SiSelected + '
-        ' + @HiddenFilter + '
-        ' + @WhType
-
-    -- Insert into ##TmpVchTaf
-    DECLARE @InsertSql NVARCHAR(MAX) = '
-    INSERT INTO ##TmpVchTaf
-    SELECT * FROM (' + @SqlTxt + ') AS Ccc 
-    ' + @InternalWhere + '
-    ' + @Where + ' 
-    ' + @Order
-
-    BEGIN TRY
-        EXEC sp_executesql @InsertSql
-    END TRY
-    BEGIN CATCH
-        PRINT 'Error inserting into ##TmpVchTaf: ' + ERROR_MESSAGE()
-    END CATCH
-
-    -- Create ##TmpVchTafMandeh explicitly
-    CREATE TABLE ##TmpVchTafMandeh (
-        Num_VdetDebtAmount BIGINT NULL,
-        Num_VdetCreditAmount BIGINT NULL
-    )
-
-    -- Build mandate query
-    DECLARE @SqlTxtMandeh NVARCHAR(MAX)='
-    SELECT 
-        CAST(SUM(vDet.Num_VdetDebtAmount) AS BIGINT) AS Num_VdetDebtAmount, 
-        CAST(SUM(vDet.Num_VdetCreditAmount) AS BIGINT) AS Num_VdetCreditAmount
-    FROM Tss_AccCodeBook cBook
-    INNER JOIN Tss_AccVoucher_Dt vDet ON cBook.SiAccCodeBook = vDet.SiAccCodeBook
-    INNER JOIN Tss_AccVoucher_Hd vHed ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd
-    WHERE ' + @StatusFilter + '
-        vHed.SiAccFinancePeriodToPlace IN (SELECT SiAccFinancePeriodToPlace FROM #TempTable)
-        AND vHed.Dat_VhedDate BETWEEN ''1385/01/01'' AND ''' + dbo.Tss_StdOneDayDecUdf(@DsFromDate) + '''
-        AND cBook.SiAccCodeBook IN (SELECT SiSel FROM dbo.Tss_StdStringSiFindUdf(''' + @SiAccCodeBook + '''))
-        AND vDet.' + @TafName + ' = ' + @SiSelected + '
-        ' + @HiddenFilter + '
-        ' + @WhType + '
-    GROUP BY vDet.SiPubPersonsSpec1'
-
-    -- Insert into ##TmpVchTafMandeh
-    DECLARE @InsertMandehSql NVARCHAR(MAX) = '
-    INSERT INTO ##TmpVchTafMandeh
-    SELECT * FROM (' + @SqlTxtMandeh + ') AS Ccc'
-
-    BEGIN TRY
-        EXEC sp_executesql @InsertMandehSql
-    END TRY
-    BEGIN CATCH
-        PRINT 'Error inserting into ##TmpVchTafMandeh: ' + ERROR_MESSAGE()
-    END CATCH
-
-    -- Create ##TmpVchTafBaBiMandeh explicitly with NVARCHAR(4000) for Des_VdetDesc
-    CREATE TABLE ##TmpVchTafBaBiMandeh (
-        SiAccVoucher_Hd NUMERIC NULL,
-        Dat_VhedDate VARCHAR(10) NULL,
-        Num_VDetRow INT NULL,
-        Des_VdetDesc NVARCHAR(4000) NULL,  -- Changed to NVARCHAR(4000)
-        Num_VdetDebtAmount BIGINT NULL,
-        Num_VdetCreditAmount BIGINT NULL,
-        Num_VhedFinalNo DECIMAL(18,0) NULL,
-        Num_VhedSubNo INT NULL
-    )
-
-    -- Combine results with CAST for Des_VdetDesc
-    DECLARE @SqlTxtBaBiMandeh NVARCHAR(MAX)
-    IF @StaMandehOrNot = 1
-    BEGIN
-        SET @SqlTxtBaBiMandeh = '
-        SELECT 
-            0 AS SiAccVoucher_Hd, 
-            '''' AS Dat_VhedDate, 
-            0 AS Num_VDetRow, 
-            CAST(''مانده از قبل'' AS NVARCHAR(4000)) AS Des_VdetDesc,  -- Cast here
-            CAST(ISNULL(Num_VdetDebtAmount, 0) AS BIGINT) AS Num_VdetDebtAmount, 
-            CAST(ISNULL(Num_VdetCreditAmount, 0) AS BIGINT) AS Num_VdetCreditAmount, 
-            CAST(0 AS DECIMAL(18,0)) AS Num_VhedFinalNo, 
-            CAST(0 AS INT) AS Num_VhedSubNo
-        FROM ##TmpVchTafMandeh
-        UNION ALL
-        SELECT 
-            SiAccVoucher_Hd, 
-            Dat_VhedDate, 
-            Num_VDetRow, 
-            CAST(Des_VdetDesc AS NVARCHAR(4000)) AS Des_VdetDesc,  -- Cast here
-            Num_VdetDebtAmount, 
-            Num_VdetCreditAmount, 
-            Num_VhedFinalNo, 
-            Num_VhedSubNo
-        FROM ##TmpVchTaf'
-    END
-    ELSE
-    BEGIN
-        SET @SqlTxtBaBiMandeh = '
-        SELECT 
-            SiAccVoucher_Hd, 
-            Dat_VhedDate, 
-            Num_VDetRow, 
-            CAST(Des_VdetDesc AS NVARCHAR(4000)) AS Des_VdetDesc,  -- Cast here
-            Num_VdetDebtAmount, 
-            Num_VdetCreditAmount, 
-            Num_VhedFinalNo, 
-            Num_VhedSubNo
-        FROM ##TmpVchTaf'
-    END
-
-    -- Insert into ##TmpVchTafBaBiMandeh
-    DECLARE @InsertCombineSql NVARCHAR(MAX) = '
-    INSERT INTO ##TmpVchTafBaBiMandeh
-    SELECT * FROM (' + @SqlTxtBaBiMandeh + ') AS Ccc 
-    ' + @InternalWhere + '
-    ' + @Where + ' 
-    ' + @Order
-
-    BEGIN TRY
-        EXEC sp_executesql @InsertCombineSql
-    END TRY
-    BEGIN CATCH
-        PRINT 'Error inserting into ##TmpVchTafBaBiMandeh: ' + ERROR_MESSAGE()
-    END CATCH
-
-    -- Final calculation - Cast MyId to DECIMAL for BCD
-    ;WITH FinalData AS (
-        SELECT 
-            CAST(ROW_NUMBER() OVER (ORDER BY Dat_VhedDate, SiAccVoucher_Hd, Num_VDetRow) AS DECIMAL(18,0)) AS MyId,
-            SiAccVoucher_Hd, 
-            CAST(Num_VhedFinalNo AS DECIMAL(18,0)) AS Num_VhedFinalNo,
-            CAST(Num_VhedSubNo AS INT) AS Num_VhedSubNo,
-            Dat_VhedDate, 
-            LEFT(Dat_VhedDate, 7) AS Dat_VhedDateMonth,
-            Num_VDetRow,
-            Des_VdetDesc,
-            CAST(Num_VdetDebtAmount AS BIGINT) AS Num_VdetDebtAmount,
-            CAST(Num_VdetCreditAmount AS BIGINT) AS Num_VdetCreditAmount,
-            CAST(Num_VdetDebtAmount - Num_VdetCreditAmount AS BIGINT) AS Acc_Rest
-        FROM ##TmpVchTafBaBiMandeh
-    ),
-    RunningSum AS (
-        SELECT 
-            *,
-            SUM(Acc_Rest) OVER (ORDER BY MyId) AS Acc_Rest_Sum
-        FROM FinalData
-    )
-    SELECT 
-        MyId,
-        SiAccVoucher_Hd,
-        Num_VhedFinalNo,
-        Num_VhedSubNo,
-        Dat_VhedDate,
-        Dat_VhedDateMonth,
-        Num_VDetRow,
-        Des_VdetDesc,
-        Num_VdetDebtAmount,
-        Num_VdetCreditAmount,
-        Acc_Rest,
-        Acc_Rest_Sum
-    FROM RunningSum
-    ORDER BY Dat_VhedDate, SiAccVoucher_Hd, Num_VDetRow
-
-    -- Cleanup
-    DROP TABLE IF EXISTS #TempTable
-    DROP TABLE IF EXISTS ##TmpVchTaf
-    DROP TABLE IF EXISTS ##TmpVchTafMandeh
-    DROP TABLE IF EXISTS ##TmpVchTafBaBiMandeh
-END
-
-GO
-
 alter PROCEDURE Tss_AccUntDailyDafDetailedPreRepVStp
 (  
 	@InternalWhere VarChar(8000)='',
@@ -6980,20 +6713,7 @@ BEGIN
     DROP TABLE IF EXISTS #A
 END
 GO
-/* ============================================================================
-   Account Extensive Review - procedures used by AccUntAccountExtensiveReview
-   Run the whole script once (needs SQL Server 2017+: dbo.Tss_StdStringSplitUdf / STRING_AGG).
-   Procedures:
-     1) Tss_AccUntAccountReviewRStp        (Group / Kol / Moein levels)
-     2) Tss_AccUntAllTafsilisReviewVStp    (Tafsil level, also "last voucher" mode)
-     3) Tss_AccUntTafsiliReview_03VStp     (Documents level: گردش تفصیلی)
-   Tss_AccUntAccountReviewTafsilLastSanadRStp is no longer used by this form
-   (its job is now done by @Sta_LastSanad of procedure 2). Leave it in place.
-   ============================================================================ */
 
-/* ---------------------------------------------------------------------------
-   1) Group / Kol / Moein
-   --------------------------------------------------------------------------- */
 CREATE OR ALTER PROCEDURE Tss_AccUntAccountReviewRStp
 (
    @InternalWhere VarChar(8000)='',
@@ -7466,338 +7186,6 @@ BEGIN
 END
 GO
 
-/* ---------------------------------------------------------------------------
-   3) Documents level (گردش تفصیلی)
-   - @AccCodePrefix: comma list of account prefixes
-   - @TafSelected  : 'type:si,type:si'   (0 person, 1 cost center, 2 project)
-   - returns account + tafsil columns, running balance over the whole selection
-   --------------------------------------------------------------------------- */
-CREATE OR ALTER PROCEDURE Tss_AccUntTafsiliReview_03VStp
-(
-    @InternalWhere VARCHAR(8000)='',
-    @Where VARCHAR(8000)='',
-    @Order VARCHAR(8000)='',
-    @DsFromDate VARCHAR(10)='1399/01/01',
-    @DsToDate VARCHAR(10)='1399/09/07',
-    @SiAccFinancePeriod NUMERIC=20,
-    @SiPubSubLocations VARCHAR(500)='1,2',
-    @Sta_Start SMALLINT=0,
-    @Sta_End SMALLINT=0,
-    @Sta_Close SMALLINT=0,
-    @StaMandehOrNot SMALLINT=1,
-    @SiAccCodeBook VARCHAR(MAX)='',
-    @SiSelected VARCHAR(50)='',
-    @SiUser NUMERIC=1,
-    @AccCodePrefix VARCHAR(MAX)='',
-    @FlgTafType SMALLINT=-1,
-    @TafSelected VARCHAR(MAX)=''
-)
-AS
-BEGIN
-    SET NOCOUNT ON
-    SET XACT_ABORT, ARITHABORT, CONCAT_NULL_YIELDS_NULL, ANSI_NULLS,
-        ANSI_NULL_DFLT_ON, ANSI_PADDING, ANSI_WARNINGS, QUOTED_IDENTIFIER ON
-
-    DROP TABLE IF EXISTS #TmpVchTaf
-    DROP TABLE IF EXISTS #TmpVchTafMandeh
-    DROP TABLE IF EXISTS #TmpVchTafBaBiMandeh
-    DROP TABLE IF EXISTS #TempTable
-    DROP TABLE IF EXISTS #Pfx
-    DROP TABLE IF EXISTS #Taf
-
-    SET @InternalWhere = CASE WHEN @InternalWhere IS NOT NULL AND @InternalWhere<>'' THEN ' WHERE '+@InternalWhere ELSE '' END
-    SET @Where         = CASE WHEN @Where         IS NOT NULL AND @Where        <>'' THEN ' WHERE '+@Where         ELSE '' END
-    SET @Order         = CASE WHEN @Order         IS NOT NULL AND @Order        <>'' THEN ' ORDER BY '+@Order    ELSE '' END
-
-    -- Build voucher-type exclusion list
-    DECLARE @WhType VARCHAR(300) =
-        CASE WHEN @Sta_Start=0
-             THEN (SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=0)
-             ELSE '' END
-
-    SET @WhType = ISNULL(@WhType,'')
-                + CASE WHEN @Sta_End=0 AND @WhType<>'' THEN ',' ELSE '' END
-                + CASE WHEN @Sta_End=0
-                       THEN ISNULL((SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=1),'')
-                       ELSE '' END
-
-    SET @WhType = @WhType
-                + CASE WHEN @Sta_Close=0 AND @WhType<>'' THEN ',' ELSE '' END
-                + CASE WHEN @Sta_Close=0
-                       THEN ISNULL((SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=3),'')
-                       ELSE '' END
-
-    SET @WhType = CASE WHEN @WhType<>'' THEN ' AND vHed.SiAccVoucherType NOT IN ('+@WhType+')' ELSE '' END
-
-    -- Determine which tafsil column to filter on
-    DECLARE @TafName VARCHAR(100) =
-        CASE @FlgTafType
-            WHEN 0 THEN 'SiPubPersonsSpec1'
-            WHEN 1 THEN 'SiPubCostCenter1'
-            WHEN 2 THEN 'SiPubProjects1'
-            ELSE
-                CASE (SELECT TOP 1 Sta_TafType1 FROM Tss_AccCodeBook
-                      WHERE SiAccCodeBook=(SELECT TOP 1 SiSel FROM dbo.Tss_StdStringSiFindUdf(@SiAccCodeBook)))
-                    WHEN 1 THEN 'SiPubPersonsSpec1'
-                    WHEN 2 THEN 'SiPubCostCenter1'
-                    WHEN 3 THEN 'SiPubProjects1'
-                    WHEN 4 THEN 'SiPurOrder_Hd1'
-                END
-        END
-
-    -- Account-code prefixes
-    SELECT LTRIM(RTRIM(value)) AS Pfx
-    INTO #Pfx
-    FROM dbo.Tss_StdStringSplitUdf(ISNULL(@AccCodePrefix,''), ',')
-    WHERE LTRIM(RTRIM(value))<>''
-
-    -- Tafsil selection pairs (type:si)
-    SELECT TRY_CAST(LEFT(v, CHARINDEX(':', v)-1) AS INT) AS TafType,
-           TRY_CAST(SUBSTRING(v, CHARINDEX(':', v)+1, 30) AS NUMERIC(18,0)) AS SiTaf
-    INTO #Taf
-    FROM (SELECT LTRIM(RTRIM(value)) AS v FROM dbo.Tss_StdStringSplitUdf(ISNULL(@TafSelected,''), ',')) s
-    WHERE v LIKE '%:%'
-
-    DECLARE @AccFilter VARCHAR(MAX)=''
-    IF EXISTS (SELECT 1 FROM #Pfx)
-        SET @AccFilter = ' AND EXISTS (SELECT 1 FROM #Pfx p WHERE cBook.Cod_AccountCode LIKE p.Pfx + ''%'')'
-    ELSE IF ISNULL(@SiAccCodeBook,'')<>''
-        SET @AccFilter = ' AND cBook.SiAccCodeBook IN (SELECT SiSel FROM dbo.Tss_StdStringSiFindUdf(''' + @SiAccCodeBook + '''))'
-
-    DECLARE @TafFilter VARCHAR(1000)=''
-    IF EXISTS (SELECT 1 FROM #Taf)
-        SET @TafFilter = ' AND EXISTS (SELECT 1 FROM #Taf t WHERE (t.TafType=0 AND vDet.SiPubPersonsSpec1=t.SiTaf) OR (t.TafType=1 AND vDet.SiPubCostCenter1=t.SiTaf) OR (t.TafType=2 AND vDet.SiPubProjects1=t.SiTaf))'
-    ELSE IF ISNULL(@SiSelected,'')<>'' AND @TafName IS NOT NULL
-        SET @TafFilter = ' AND vDet.' + @TafName + ' = ' + @SiSelected
-
-    DECLARE @AccAllDocs SMALLINT = dbo.Tss_StdFindSystemParamValue('AccAllDocs')
-
-    DECLARE @HiddenFilter VARCHAR(500)
-    IF dbo.Tss_StdFindIfUserIsInGroup(@SiUser,'AccStar') = 1
-        SET @HiddenFilter = ''
-    ELSE
-        SET @HiddenFilter = ' AND (vDet.Sta_IsHidden = 0 OR vDet.Sta_IsHidden IS NULL) '
-
-    SELECT SiAccFinancePeriodToPlace INTO #TempTable FROM dbo.Tss_AccFinancePeriodToPlace
-    WHERE SiPubSubLocations IN (SELECT * FROM dbo.Tss_StdStringSiFindUdf(@SiPubSubLocations))
-
-    -- -------------------------------------------------------------------
-    -- #TmpVchTaf: filtered voucher lines for the requested date range
-    -- -------------------------------------------------------------------
-    CREATE TABLE #TmpVchTaf (
-        SiAccVoucher_Hd      NUMERIC       NULL,
-        Dat_VhedDate         VARCHAR(10)   NULL,
-        Num_VDetRow          INT           NULL,
-        Des_VdetDesc         NVARCHAR(4000)NULL,
-        Num_VdetDebtAmount   BIGINT        NULL,
-        Num_VdetCreditAmount BIGINT        NULL,
-        Num_VhedFinalNo      DECIMAL(18,0) NULL,
-        Num_VhedSubNo        INT           NULL,
-        Cod_AccountCode      VARCHAR(50)   NULL,
-        Des_AccountDesc      NVARCHAR(200) NULL,
-        TafCode              VARCHAR(50)   NULL,
-        TafName              NVARCHAR(401) NULL
-    )
-
-    DECLARE @StatusFilter VARCHAR(100) =
-        CASE WHEN @AccAllDocs=0
-             THEN 'vHed.Sta_VochStatus >= 3 AND vHed.Sta_VochStatus <> 5 AND '
-             ELSE 'vHed.Sta_VochStatus >= 3 AND ' END
-
-    DECLARE @SqlTxt NVARCHAR(MAX) = N'
-    SELECT
-        vHed.SiAccVoucher_Hd,
-        vHed.Dat_VhedDate,
-        vDet.Num_VDetRow,
-        Des_VdetDesc = CAST(CASE WHEN Tss_AccVoucherType.Sta_VoucherTypeGroup IN (4,5)
-                                 THEN ISNULL(vDet.Des_VdetDesc,'''')
-                                 ELSE vDet.Des_VdetDesc
-                            END AS NVARCHAR(4000)),
-        CAST(vDet.Num_VdetDebtAmount   AS BIGINT) AS Num_VdetDebtAmount,
-        CAST(vDet.Num_VdetCreditAmount AS BIGINT) AS Num_VdetCreditAmount,
-        CAST(vHed.Num_VhedFinalNo      AS DECIMAL(18,0)) AS Num_VhedFinalNo,
-        CAST(vHed.Num_VhedSubNo        AS INT)           AS Num_VhedSubNo,
-        CAST(cBook.Cod_AccountCode     AS VARCHAR(50))   AS Cod_AccountCode,
-        CAST(cBook.Des_AccountDesc     AS NVARCHAR(200)) AS Des_AccountDesc,
-        CAST(COALESCE(pv.Cod_PubPersonCode, cc.Cod_CostCenterCode, pr.Cod_ProjectsCode, '''') AS VARCHAR(50)) AS TafCode,
-        CAST(COALESCE(pv.Des_FullName, cc.Des_CostCenterName, pr.Des_ProjectsThemeDesc, '''') AS NVARCHAR(401)) AS TafName
-    FROM Tss_AccCodeBook cBook
-    INNER JOIN Tss_AccVoucher_Dt vDet ON cBook.SiAccCodeBook = vDet.SiAccCodeBook
-    INNER JOIN Tss_AccVoucher_Hd vHed ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd
-    INNER JOIN Tss_AccVoucherType ON vHed.SiAccVoucherType = Tss_AccVoucherType.SiAccVoucherType
-    LEFT JOIN Tss_PubPersonsViw pv ON vDet.SiPubPersonsSpec1 = pv.SiPubPersonsSpec
-    LEFT JOIN Tss_PubCostCenter cc ON vDet.SiPubCostCenter1 = cc.SiPubCostCenter
-    LEFT JOIN Tss_PubProjects    pr ON vDet.SiPubProjects1   = pr.SiPubProjects
-    WHERE ' + @StatusFilter + N'
-        vHed.SiAccFinancePeriodToPlace IN (SELECT SiAccFinancePeriodToPlace FROM #TempTable)
-        AND vHed.Dat_VhedDate BETWEEN ''' + @DsFromDate + N''' AND ''' + @DsToDate + N'''
-        ' + @AccFilter + N'
-        ' + @TafFilter + N'
-        ' + @HiddenFilter + N'
-        ' + @WhType
-
-    -- Combine the two optional WHERE wrappers into a single clause
-    DECLARE @CombinedWhere VARCHAR(MAX) = ''
-    IF @InternalWhere <> '' AND @Where <> ''
-        SET @CombinedWhere = @InternalWhere + ' AND ' + SUBSTRING(@Where, 8, LEN(@Where))
-    ELSE IF @InternalWhere <> ''
-        SET @CombinedWhere = @InternalWhere
-    ELSE
-        SET @CombinedWhere = @Where
-
-    -- NOTE: no ORDER BY inside INSERT
-    DECLARE @InsertSql NVARCHAR(MAX) = N'
-    INSERT INTO #TmpVchTaf
-    SELECT * FROM (' + @SqlTxt + N') AS Ccc
-    ' + @CombinedWhere
-
-    BEGIN TRY
-        EXEC sp_executesql @InsertSql
-    END TRY
-    BEGIN CATCH
-        PRINT 'Error inserting into #TmpVchTaf: ' + ERROR_MESSAGE()
-    END CATCH
-
-    -- -------------------------------------------------------------------
-    -- #TmpVchTafMandeh: opening balance (before @DsFromDate)
-    -- -------------------------------------------------------------------
-    CREATE TABLE #TmpVchTafMandeh (
-        Num_VdetDebtAmount   BIGINT NULL,
-        Num_VdetCreditAmount BIGINT NULL
-    )
-
-    DECLARE @SqlTxtMandeh NVARCHAR(MAX) = N'
-    SELECT
-        CAST(SUM(vDet.Num_VdetDebtAmount)   AS BIGINT) AS Num_VdetDebtAmount,
-        CAST(SUM(vDet.Num_VdetCreditAmount) AS BIGINT) AS Num_VdetCreditAmount
-    FROM Tss_AccCodeBook cBook
-    INNER JOIN Tss_AccVoucher_Dt vDet ON cBook.SiAccCodeBook = vDet.SiAccCodeBook
-    INNER JOIN Tss_AccVoucher_Hd vHed ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd
-    WHERE ' + @StatusFilter + N'
-        vHed.SiAccFinancePeriodToPlace IN (SELECT SiAccFinancePeriodToPlace FROM #TempTable)
-        AND vHed.Dat_VhedDate BETWEEN ''1385/01/01'' AND ''' + dbo.Tss_StdOneDayDecUdf(@DsFromDate) + N'''
-        ' + @AccFilter + N'
-        ' + @TafFilter + N'
-        ' + @HiddenFilter + N'
-        ' + @WhType
-
-    DECLARE @InsertMandehSql NVARCHAR(MAX) = N'
-    INSERT INTO #TmpVchTafMandeh
-    SELECT * FROM (' + @SqlTxtMandeh + N') AS Ccc'
-
-    BEGIN TRY
-        EXEC sp_executesql @InsertMandehSql
-    END TRY
-    BEGIN CATCH
-        PRINT 'Error inserting into #TmpVchTafMandeh: ' + ERROR_MESSAGE()
-    END CATCH
-
-    -- -------------------------------------------------------------------
-    -- #TmpVchTafBaBiMandeh: opening row + in-range rows
-    -- -------------------------------------------------------------------
-    CREATE TABLE #TmpVchTafBaBiMandeh (
-        SiAccVoucher_Hd      NUMERIC        NULL,
-        Dat_VhedDate         VARCHAR(10)    NULL,
-        Num_VDetRow          INT            NULL,
-        Des_VdetDesc         NVARCHAR(4000) NULL,
-        Num_VdetDebtAmount   BIGINT         NULL,
-        Num_VdetCreditAmount BIGINT         NULL,
-        Num_VhedFinalNo      DECIMAL(18,0)  NULL,
-        Num_VhedSubNo        INT            NULL,
-        Cod_AccountCode      VARCHAR(50)    NULL,
-        Des_AccountDesc      NVARCHAR(200)  NULL,
-        TafCode              VARCHAR(50)    NULL,
-        TafName              NVARCHAR(401)  NULL
-    )
-
-    DECLARE @SqlTxtBaBiMandeh NVARCHAR(MAX)
-    IF @StaMandehOrNot = 1
-    BEGIN
-        SET @SqlTxtBaBiMandeh = N'
-        SELECT
-            CAST(0 AS NUMERIC)        AS SiAccVoucher_Hd,
-            CAST('''' AS VARCHAR(10)) AS Dat_VhedDate,
-            0                         AS Num_VDetRow,
-            CAST(N''مانده از قبل'' AS NVARCHAR(4000)) AS Des_VdetDesc,
-            CAST(ISNULL(Num_VdetDebtAmount, 0)   AS BIGINT) AS Num_VdetDebtAmount,
-            CAST(ISNULL(Num_VdetCreditAmount, 0) AS BIGINT) AS Num_VdetCreditAmount,
-            CAST(0 AS DECIMAL(18,0))  AS Num_VhedFinalNo,
-            CAST(0 AS INT)            AS Num_VhedSubNo,
-            CAST('''' AS VARCHAR(50)) AS Cod_AccountCode,
-            CAST('''' AS NVARCHAR(200)) AS Des_AccountDesc,
-            CAST('''' AS VARCHAR(50)) AS TafCode,
-            CAST('''' AS NVARCHAR(401)) AS TafName
-        FROM #TmpVchTafMandeh
-        UNION ALL
-        SELECT
-            SiAccVoucher_Hd, Dat_VhedDate, Num_VDetRow, Des_VdetDesc,
-            Num_VdetDebtAmount, Num_VdetCreditAmount, Num_VhedFinalNo, Num_VhedSubNo,
-            Cod_AccountCode, Des_AccountDesc, TafCode, TafName
-        FROM #TmpVchTaf'
-    END
-    ELSE
-    BEGIN
-        SET @SqlTxtBaBiMandeh = N'
-        SELECT
-            SiAccVoucher_Hd, Dat_VhedDate, Num_VDetRow, Des_VdetDesc,
-            Num_VdetDebtAmount, Num_VdetCreditAmount, Num_VhedFinalNo, Num_VhedSubNo,
-            Cod_AccountCode, Des_AccountDesc, TafCode, TafName
-        FROM #TmpVchTaf'
-    END
-
-    DECLARE @InsertCombineSql NVARCHAR(MAX) = N'
-    INSERT INTO #TmpVchTafBaBiMandeh
-    SELECT * FROM (' + @SqlTxtBaBiMandeh + N') AS Ccc
-    ' + @CombinedWhere
-
-    BEGIN TRY
-        EXEC sp_executesql @InsertCombineSql
-    END TRY
-    BEGIN CATCH
-        PRINT 'Error inserting into #TmpVchTafBaBiMandeh: ' + ERROR_MESSAGE()
-    END CATCH
-
-    -- -------------------------------------------------------------------
-    -- Final result: running balance over the ordered set
-    -- -------------------------------------------------------------------
-    ;WITH FinalData AS (
-        SELECT
-            CAST(ROW_NUMBER() OVER (ORDER BY Dat_VhedDate, SiAccVoucher_Hd, Num_VDetRow) AS DECIMAL(18,0)) AS MyId,
-            SiAccVoucher_Hd,
-            CAST(Num_VhedFinalNo AS DECIMAL(18,0)) AS Num_VhedFinalNo,
-            CAST(Num_VhedSubNo   AS INT)           AS Num_VhedSubNo,
-            Dat_VhedDate,
-            LEFT(Dat_VhedDate, 7) AS Dat_VhedDateMonth,
-            Num_VDetRow,
-            Des_VdetDesc,
-            CAST(Num_VdetDebtAmount   AS BIGINT) AS Num_VdetDebtAmount,
-            CAST(Num_VdetCreditAmount AS BIGINT) AS Num_VdetCreditAmount,
-            CAST(Num_VdetDebtAmount - Num_VdetCreditAmount AS BIGINT) AS Acc_Rest,
-            Cod_AccountCode, Des_AccountDesc, TafCode, TafName
-        FROM #TmpVchTafBaBiMandeh
-    ),
-    RunningSum AS (
-        SELECT *,
-               SUM(Acc_Rest) OVER (ORDER BY MyId ROWS UNBOUNDED PRECEDING) AS Acc_Rest_Sum
-        FROM FinalData
-    )
-    SELECT
-        MyId, SiAccVoucher_Hd, Num_VhedFinalNo, Num_VhedSubNo,
-        Dat_VhedDate, Dat_VhedDateMonth, Num_VDetRow, Des_VdetDesc,
-        Num_VdetDebtAmount, Num_VdetCreditAmount, Acc_Rest, Acc_Rest_Sum,
-        Cod_AccountCode, Des_AccountDesc, TafCode, TafName
-    FROM RunningSum
-    ORDER BY MyId
-
-    DROP TABLE IF EXISTS #TempTable
-    DROP TABLE IF EXISTS #TmpVchTaf
-    DROP TABLE IF EXISTS #TmpVchTafMandeh
-    DROP TABLE IF EXISTS #TmpVchTafBaBiMandeh
-    DROP TABLE IF EXISTS #Pfx
-    DROP TABLE IF EXISTS #Taf
-END
-GO
-
 CREATE or alter  FUNCTION dbo.Tss_StdStringSplitUdf
 (
     @List  NVARCHAR(MAX),
@@ -7916,287 +7304,6 @@ BEGIN
 END
 
 
-GO
-
-alter PROCEDURE Tss_AccUntTafsiliReview_03VStp
-(
-    @InternalWhere VARCHAR(8000)='',
-    @Where VARCHAR(8000)='',
-    @Order VARCHAR(8000)='',
-    @DsFromDate VARCHAR(10)='1399/01/01',
-    @DsToDate VARCHAR(10)='1399/09/07',
-    @SiAccFinancePeriod NUMERIC=20,
-    @SiPubSubLocations VARCHAR(500)='1,2',
-    @Sta_Start SMALLINT=0,
-    @Sta_End SMALLINT=0,
-    @Sta_Close SMALLINT=0,
-    @StaMandehOrNot SMALLINT=1,
-    @SiAccCodeBook VARCHAR(MAX)='',
-    @SiSelected VARCHAR(50)='',
-    @SiUser NUMERIC=1,
-    @AccCodePrefix VARCHAR(MAX)='',
-    @FlgTafType SMALLINT=-1,
-    @TafSelected VARCHAR(MAX)=''
-)
-AS
-BEGIN
-    SET NOCOUNT ON
-    SET XACT_ABORT, ARITHABORT, CONCAT_NULL_YIELDS_NULL, ANSI_NULLS, ANSI_NULL_DFLT_ON, ANSI_PADDING, ANSI_WARNINGS, QUOTED_IDENTIFIER ON
-
-    DROP TABLE IF EXISTS #TmpVchTaf
-    DROP TABLE IF EXISTS #TmpVchTafMandeh
-    DROP TABLE IF EXISTS #TmpVchTafBaBiMandeh
-    DROP TABLE IF EXISTS #TempTable
-    DROP TABLE IF EXISTS #Pfx
-    DROP TABLE IF EXISTS #Taf
-
-    SET @InternalWhere = CASE WHEN @InternalWhere IS NOT NULL AND @InternalWhere<>'' THEN ' WHERE '+@InternalWhere ELSE '' END
-    SET @Where = CASE WHEN @Where IS NOT NULL AND @Where<>'' THEN ' WHERE '+@Where ELSE '' END
-    SET @Order = CASE WHEN @Order IS NOT NULL AND @Order<>'' THEN ' ORDER BY '+@Order ELSE '' END
-
-    DECLARE @WhType VARCHAR(300)=CASE
-        WHEN @Sta_Start=0 THEN (SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=0) ELSE '' END
-    SET @WhType = ISNULL(@WhType,'')
-    SET @WhType = @WhType + CASE WHEN @Sta_End=0 AND @WhType<>'' THEN ',' ELSE '' END +
-        CASE WHEN @Sta_End=0 THEN ISNULL((SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=1),'') ELSE '' END
-    SET @WhType = @WhType + CASE WHEN @Sta_Close=0 AND @WhType<>'' THEN ',' ELSE '' END +
-        CASE WHEN @Sta_Close=0 THEN ISNULL((SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=3),'') ELSE '' END
-    SET @WhType = CASE WHEN @WhType<>'' THEN ' AND vHed.SiAccVoucherType NOT IN ('+@WhType+')' ELSE '' END
-
-    DECLARE @TafName VARCHAR(100)=CASE @FlgTafType
-        WHEN 0 THEN 'SiPubPersonsSpec1'
-        WHEN 1 THEN 'SiPubCostCenter1'
-        WHEN 2 THEN 'SiPubProjects1'
-        ELSE CASE (SELECT TOP 1 Sta_TafType1 FROM Tss_AccCodeBook WHERE SiAccCodeBook=(SELECT TOP 1 SiSel FROM dbo.Tss_StdStringSiFindUdf(@SiAccCodeBook)))
-            WHEN 1 THEN 'SiPubPersonsSpec1' WHEN 2 THEN 'SiPubCostCenter1' WHEN 3 THEN 'SiPubProjects1' WHEN 4 THEN 'SiPurOrder_Hd1' END
-        END
-
-    SELECT LTRIM(RTRIM(value)) AS Pfx
-    INTO #Pfx
-    FROM dbo.Tss_StdStringSplitUdf(ISNULL(@AccCodePrefix,''), ',')
-    WHERE LTRIM(RTRIM(value))<>''
-
-    SELECT TRY_CAST(LEFT(v, CHARINDEX(':', v)-1) AS INT) AS TafType,
-           TRY_CAST(SUBSTRING(v, CHARINDEX(':', v)+1, 30) AS NUMERIC(18,0)) AS SiTaf
-    INTO #Taf
-    FROM (SELECT LTRIM(RTRIM(value)) AS v FROM dbo.Tss_StdStringSplitUdf(ISNULL(@TafSelected,''), ',')) s
-    WHERE v LIKE '%:%'
-
-    DECLARE @AccFilter VARCHAR(MAX)=''
-    IF EXISTS (SELECT 1 FROM #Pfx)
-        SET @AccFilter = ' AND EXISTS (SELECT 1 FROM #Pfx p WHERE cBook.Cod_AccountCode LIKE p.Pfx + ''%'')'
-    ELSE IF ISNULL(@SiAccCodeBook,'')<>''
-        SET @AccFilter = ' AND cBook.SiAccCodeBook IN (SELECT SiSel FROM dbo.Tss_StdStringSiFindUdf(''' + @SiAccCodeBook + '''))'
-
-    DECLARE @TafFilter VARCHAR(1000)=''
-    IF EXISTS (SELECT 1 FROM #Taf)
-        SET @TafFilter = ' AND EXISTS (SELECT 1 FROM #Taf t WHERE (t.TafType=0 AND vDet.SiPubPersonsSpec1=t.SiTaf) OR (t.TafType=1 AND vDet.SiPubCostCenter1=t.SiTaf) OR (t.TafType=2 AND vDet.SiPubProjects1=t.SiTaf))'
-    ELSE IF ISNULL(@SiSelected,'')<>'' AND @TafName IS NOT NULL
-        SET @TafFilter = ' AND vDet.' + @TafName + ' = ' + @SiSelected
-
-    DECLARE @AccAllDocs SMALLINT = dbo.Tss_StdFindSystemParamValue('AccAllDocs')
-
-    DECLARE @HiddenFilter VARCHAR(500)
-    IF dbo.Tss_StdFindIfUserIsInGroup(@SiUser,'AccStar') = 1
-        SET @HiddenFilter = ''
-    ELSE
-        SET @HiddenFilter = ' AND (vDet.Sta_IsHidden = 0 OR vDet.Sta_IsHidden IS NULL) '
-
-    SELECT SiAccFinancePeriodToPlace INTO #TempTable FROM dbo.Tss_AccFinancePeriodToPlace
-    WHERE SiPubSubLocations IN (SELECT * FROM dbo.Tss_StdStringSiFindUdf(@SiPubSubLocations))
-
-    CREATE TABLE #TmpVchTaf (
-        SiAccVoucher_Hd NUMERIC NULL,
-        Dat_VhedDate VARCHAR(10) NULL,
-        Num_VDetRow INT NULL,
-        Des_VdetDesc NVARCHAR(4000) NULL,
-        Num_VdetDebtAmount BIGINT NULL,
-        Num_VdetCreditAmount BIGINT NULL,
-        Num_VhedFinalNo DECIMAL(18,0) NULL,
-        Num_VhedSubNo NUMERIC(18,0) NULL,
-        Cod_AccountCode VARCHAR(50) NULL,
-        Des_AccountDesc NVARCHAR(200) NULL,
-        TafCode VARCHAR(50) NULL,
-        TafName NVARCHAR(401) NULL
-    )
-
-    DECLARE @StatusFilter VARCHAR(100)=CASE WHEN @AccAllDocs=0 THEN 'vHed.Sta_VochStatus >= 3 AND vHed.Sta_VochStatus <> 5 AND ' ELSE 'vHed.Sta_VochStatus >= 3 AND ' END
-
-    DECLARE @SqlTxt NVARCHAR(MAX)=N'
-    SELECT
-        vHed.SiAccVoucher_Hd,
-        vHed.Dat_VhedDate,
-        vDet.Num_VDetRow,
-        Des_VdetDesc = CAST(CASE WHEN Tss_AccVoucherType.Sta_VoucherTypeGroup IN (4,5)
-            THEN ISNULL(vDet.Des_VdetDesc,'''')
-            ELSE vDet.Des_VdetDesc
-        END AS NVARCHAR(4000)),
-        CAST(vDet.Num_VdetDebtAmount AS BIGINT) AS Num_VdetDebtAmount,
-        CAST(vDet.Num_VdetCreditAmount AS BIGINT) AS Num_VdetCreditAmount,
-        CAST(vHed.Num_VhedFinalNo AS DECIMAL(18,0)) AS Num_VhedFinalNo,
-        CAST(vHed.SiAccVoucher_Hd AS NUMERIC(18,0)) AS Num_VhedSubNo,
-        CAST(cBook.Cod_AccountCode AS VARCHAR(50)) AS Cod_AccountCode,
-        CAST(cBook.Des_AccountDesc AS NVARCHAR(200)) AS Des_AccountDesc,
-        CAST(COALESCE(pv.Cod_PubPersonCode, cc.Cod_CostCenterCode, pr.Cod_ProjectsCode, '''') AS VARCHAR(50)) AS TafCode,
-        CAST(COALESCE(pv.Des_FullName, cc.Des_CostCenterName, pr.Des_ProjectsThemeDesc, '''') AS NVARCHAR(401)) AS TafName
-    FROM Tss_AccCodeBook cBook
-    INNER JOIN Tss_AccVoucher_Dt vDet ON cBook.SiAccCodeBook = vDet.SiAccCodeBook
-    INNER JOIN Tss_AccVoucher_Hd vHed ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd
-    INNER JOIN Tss_AccVoucherType ON vHed.SiAccVoucherType = Tss_AccVoucherType.SiAccVoucherType
-    LEFT JOIN Tss_PubPersonsViw pv ON vDet.SiPubPersonsSpec1 = pv.SiPubPersonsSpec
-    LEFT JOIN Tss_PubCostCenter cc ON vDet.SiPubCostCenter1 = cc.SiPubCostCenter
-    LEFT JOIN Tss_PubProjects pr ON vDet.SiPubProjects1 = pr.SiPubProjects
-    WHERE ' + @StatusFilter + N'
-        vHed.SiAccFinancePeriodToPlace IN (SELECT SiAccFinancePeriodToPlace FROM #TempTable)
-        AND vHed.Dat_VhedDate BETWEEN ''' + @DsFromDate + N''' AND ''' + @DsToDate + N'''
-        ' + @AccFilter + N'
-        ' + @TafFilter + N'
-        ' + @HiddenFilter + N'
-        ' + @WhType
-
-    DECLARE @InsertSql NVARCHAR(MAX) = N'
-    INSERT INTO #TmpVchTaf
-    SELECT * FROM (' + @SqlTxt + N') AS Ccc
-    ' + @InternalWhere + N'
-    ' + @Where + N'
-    ' + @Order
-
-    BEGIN TRY
-        EXEC sp_executesql @InsertSql
-    END TRY
-    BEGIN CATCH
-        PRINT 'Error inserting into #TmpVchTaf: ' + ERROR_MESSAGE()
-    END CATCH
-
-    CREATE TABLE #TmpVchTafMandeh (
-        Num_VdetDebtAmount BIGINT NULL,
-        Num_VdetCreditAmount BIGINT NULL
-    )
-
-    DECLARE @SqlTxtMandeh NVARCHAR(MAX)=N'
-    SELECT
-        CAST(SUM(vDet.Num_VdetDebtAmount) AS BIGINT) AS Num_VdetDebtAmount,
-        CAST(SUM(vDet.Num_VdetCreditAmount) AS BIGINT) AS Num_VdetCreditAmount
-    FROM Tss_AccCodeBook cBook
-    INNER JOIN Tss_AccVoucher_Dt vDet ON cBook.SiAccCodeBook = vDet.SiAccCodeBook
-    INNER JOIN Tss_AccVoucher_Hd vHed ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd
-    WHERE ' + @StatusFilter + N'
-        vHed.SiAccFinancePeriodToPlace IN (SELECT SiAccFinancePeriodToPlace FROM #TempTable)
-        AND vHed.Dat_VhedDate BETWEEN ''1385/01/01'' AND ''' + dbo.Tss_StdOneDayDecUdf(@DsFromDate) + N'''
-        ' + @AccFilter + N'
-        ' + @TafFilter + N'
-        ' + @HiddenFilter + N'
-        ' + @WhType
-
-    DECLARE @InsertMandehSql NVARCHAR(MAX) = N'
-    INSERT INTO #TmpVchTafMandeh
-    SELECT * FROM (' + @SqlTxtMandeh + N') AS Ccc'
-
-    BEGIN TRY
-        EXEC sp_executesql @InsertMandehSql
-    END TRY
-    BEGIN CATCH
-        PRINT 'Error inserting into #TmpVchTafMandeh: ' + ERROR_MESSAGE()
-    END CATCH
-
-    CREATE TABLE #TmpVchTafBaBiMandeh (
-        SiAccVoucher_Hd NUMERIC NULL,
-        Dat_VhedDate VARCHAR(10) NULL,
-        Num_VDetRow INT NULL,
-        Des_VdetDesc NVARCHAR(4000) NULL,
-        Num_VdetDebtAmount BIGINT NULL,
-        Num_VdetCreditAmount BIGINT NULL,
-        Num_VhedFinalNo DECIMAL(18,0) NULL,
-        Num_VhedSubNo NUMERIC(18,0) NULL,
-        Cod_AccountCode VARCHAR(50) NULL,
-        Des_AccountDesc NVARCHAR(200) NULL,
-        TafCode VARCHAR(50) NULL,
-        TafName NVARCHAR(401) NULL
-    )
-
-    DECLARE @SqlTxtBaBiMandeh NVARCHAR(MAX)
-    IF @StaMandehOrNot = 1
-    BEGIN
-        SET @SqlTxtBaBiMandeh = N'
-        SELECT
-            CAST(0 AS NUMERIC) AS SiAccVoucher_Hd,
-            CAST('''' AS VARCHAR(10)) AS Dat_VhedDate,
-            0 AS Num_VDetRow,
-            CAST(N''مانده از قبل'' AS NVARCHAR(4000)) AS Des_VdetDesc,
-            CAST(ISNULL(Num_VdetDebtAmount, 0) AS BIGINT) AS Num_VdetDebtAmount,
-            CAST(ISNULL(Num_VdetCreditAmount, 0) AS BIGINT) AS Num_VdetCreditAmount,
-            CAST(0 AS DECIMAL(18,0)) AS Num_VhedFinalNo,
-            CAST(0 AS NUMERIC(18,0)) AS Num_VhedSubNo,
-            CAST('''' AS VARCHAR(50)) AS Cod_AccountCode,
-            CAST('''' AS NVARCHAR(200)) AS Des_AccountDesc,
-            CAST('''' AS VARCHAR(50)) AS TafCode,
-            CAST('''' AS NVARCHAR(401)) AS TafName
-        FROM #TmpVchTafMandeh
-        UNION ALL
-        SELECT
-            SiAccVoucher_Hd, Dat_VhedDate, Num_VDetRow, Des_VdetDesc,
-            Num_VdetDebtAmount, Num_VdetCreditAmount, Num_VhedFinalNo, Num_VhedSubNo,
-            Cod_AccountCode, Des_AccountDesc, TafCode, TafName
-        FROM #TmpVchTaf'
-    END
-    ELSE
-    BEGIN
-        SET @SqlTxtBaBiMandeh = N'
-        SELECT
-            SiAccVoucher_Hd, Dat_VhedDate, Num_VDetRow, Des_VdetDesc,
-            Num_VdetDebtAmount, Num_VdetCreditAmount, Num_VhedFinalNo, Num_VhedSubNo,
-            Cod_AccountCode, Des_AccountDesc, TafCode, TafName
-        FROM #TmpVchTaf'
-    END
-
-    DECLARE @InsertCombineSql NVARCHAR(MAX) = N'
-    INSERT INTO #TmpVchTafBaBiMandeh
-    SELECT * FROM (' + @SqlTxtBaBiMandeh + N') AS Ccc
-    ' + @InternalWhere + N'
-    ' + @Where + N'
-    ' + @Order
-
-    BEGIN TRY
-        EXEC sp_executesql @InsertCombineSql
-    END TRY
-    BEGIN CATCH
-        PRINT 'Error inserting into #TmpVchTafBaBiMandeh: ' + ERROR_MESSAGE()
-    END CATCH
-
-    ;WITH FinalData AS (
-        SELECT
-            CAST(ROW_NUMBER() OVER (ORDER BY Dat_VhedDate, SiAccVoucher_Hd, Num_VDetRow) AS DECIMAL(18,0)) AS MyId,
-            SiAccVoucher_Hd,
-            CAST(Num_VhedFinalNo AS DECIMAL(18,0)) AS Num_VhedFinalNo,
-            CAST(Num_VhedSubNo AS NUMERIC(18,0)) AS Num_VhedSubNo,
-            Dat_VhedDate,
-            LEFT(Dat_VhedDate, 7) AS Dat_VhedDateMonth,
-            Num_VDetRow,
-            Des_VdetDesc,
-            CAST(Num_VdetDebtAmount AS BIGINT) AS Num_VdetDebtAmount,
-            CAST(Num_VdetCreditAmount AS BIGINT) AS Num_VdetCreditAmount,
-            CAST(Num_VdetDebtAmount - Num_VdetCreditAmount AS BIGINT) AS Acc_Rest,
-            Cod_AccountCode, Des_AccountDesc, TafCode, TafName
-        FROM #TmpVchTafBaBiMandeh
-    ),
-    RunningSum AS (
-        SELECT *, SUM(Acc_Rest) OVER (ORDER BY MyId ROWS UNBOUNDED PRECEDING) AS Acc_Rest_Sum
-        FROM FinalData
-    )
-    SELECT
-        MyId, SiAccVoucher_Hd, Num_VhedFinalNo, Num_VhedSubNo, Dat_VhedDate, Dat_VhedDateMonth,
-        Num_VDetRow, Des_VdetDesc, Num_VdetDebtAmount, Num_VdetCreditAmount, Acc_Rest, Acc_Rest_Sum,
-        Cod_AccountCode, Des_AccountDesc, TafCode, TafName
-    FROM RunningSum
-    ORDER BY MyId
-
-    DROP TABLE IF EXISTS #TempTable
-    DROP TABLE IF EXISTS #TmpVchTaf
-    DROP TABLE IF EXISTS #TmpVchTafMandeh
-    DROP TABLE IF EXISTS #TmpVchTafBaBiMandeh
-    DROP TABLE IF EXISTS #Pfx
-    DROP TABLE IF EXISTS #Taf
-END
 GO
 
 alter PROCEDURE Tss_AccUntTafsiliReview_01VStp
@@ -8414,767 +7521,58 @@ Exec(@SqlTxt)
 
 GO
 
-alter PROCEDURE Tss_AccUntTafsiliReview_03VStp
-(
-    @InternalWhere VARCHAR(8000)='',
-    @Where VARCHAR(8000)='',
-    @Order VARCHAR(8000)='',
-    @DsFromDate VARCHAR(10)='1399/01/01',
-    @DsToDate VARCHAR(10)='1399/09/07',
-    @SiAccFinancePeriod NUMERIC=20,
-    @SiPubSubLocations VARCHAR(500)='1,2',
-    @Sta_Start SMALLINT=0,
-    @Sta_End SMALLINT=0,
-    @Sta_Close SMALLINT=0,
-    @StaMandehOrNot SMALLINT=1,
-    @SiAccCodeBook VARCHAR(MAX)='',
-    @SiSelected VARCHAR(50)='',
-    @SiUser NUMERIC=1,
-    @AccCodePrefix VARCHAR(MAX)='',
-    @FlgTafType SMALLINT=-1,
-    @TafSelected VARCHAR(MAX)=''
-)
+alter VIEW Tss_RapRecCheckGhabzRep1Vw
 AS
-BEGIN
-    SET NOCOUNT ON
-    SET XACT_ABORT, ARITHABORT, CONCAT_NULL_YIELDS_NULL, ANSI_NULLS, ANSI_NULL_DFLT_ON, ANSI_PADDING, ANSI_WARNINGS, QUOTED_IDENTIFIER ON
-
-    DROP TABLE IF EXISTS #TmpVchTaf
-    DROP TABLE IF EXISTS #TmpVchTafMandeh
-    DROP TABLE IF EXISTS #TmpVchTafBaBiMandeh
-    DROP TABLE IF EXISTS #TempTable
-    DROP TABLE IF EXISTS #Pfx
-    DROP TABLE IF EXISTS #Taf
-
-    SET @InternalWhere = CASE WHEN @InternalWhere IS NOT NULL AND @InternalWhere<>'' THEN ' WHERE '+@InternalWhere ELSE '' END
-    SET @Where = CASE WHEN @Where IS NOT NULL AND @Where<>'' THEN ' WHERE '+@Where ELSE '' END
-    SET @Order = CASE WHEN @Order IS NOT NULL AND @Order<>'' THEN ' ORDER BY '+@Order ELSE '' END
-
-    DECLARE @WhType VARCHAR(300)=CASE
-        WHEN @Sta_Start=0 THEN (SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=0) ELSE '' END
-    SET @WhType = ISNULL(@WhType,'')
-    SET @WhType = @WhType + CASE WHEN @Sta_End=0 AND @WhType<>'' THEN ',' ELSE '' END +
-        CASE WHEN @Sta_End=0 THEN ISNULL((SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=1),'') ELSE '' END
-    SET @WhType = @WhType + CASE WHEN @Sta_Close=0 AND @WhType<>'' THEN ',' ELSE '' END +
-        CASE WHEN @Sta_Close=0 THEN ISNULL((SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=3),'') ELSE '' END
-    SET @WhType = CASE WHEN @WhType<>'' THEN ' AND vHed.SiAccVoucherType NOT IN ('+@WhType+')' ELSE '' END
-
-    DECLARE @TafName VARCHAR(100)=CASE @FlgTafType
-        WHEN 0 THEN 'SiPubPersonsSpec1'
-        WHEN 1 THEN 'SiPubCostCenter1'
-        WHEN 2 THEN 'SiPubProjects1'
-        ELSE CASE (SELECT TOP 1 Sta_TafType1 FROM Tss_AccCodeBook WHERE SiAccCodeBook=(SELECT TOP 1 SiSel FROM dbo.Tss_StdStringSiFindUdf(@SiAccCodeBook)))
-            WHEN 1 THEN 'SiPubPersonsSpec1' WHEN 2 THEN 'SiPubCostCenter1' WHEN 3 THEN 'SiPubProjects1' WHEN 4 THEN 'SiPurOrder_Hd1' END
-        END
-
-    SELECT LTRIM(RTRIM(value)) AS Pfx
-    INTO #Pfx
-    FROM dbo.Tss_StdStringSplitUdf(ISNULL(@AccCodePrefix,''), ',')
-    WHERE LTRIM(RTRIM(value))<>''
-
-    SELECT TRY_CAST(LEFT(v, CHARINDEX(':', v)-1) AS INT) AS TafType,
-           TRY_CAST(SUBSTRING(v, CHARINDEX(':', v)+1, 30) AS NUMERIC(18,0)) AS SiTaf
-    INTO #Taf
-    FROM (SELECT LTRIM(RTRIM(value)) AS v FROM dbo.Tss_StdStringSplitUdf(ISNULL(@TafSelected,''), ',')) s
-    WHERE v LIKE '%:%'
-
-    DECLARE @AccFilter VARCHAR(MAX)=''
-    IF EXISTS (SELECT 1 FROM #Pfx)
-        SET @AccFilter = ' AND EXISTS (SELECT 1 FROM #Pfx p WHERE cBook.Cod_AccountCode LIKE p.Pfx + ''%'')'
-    ELSE IF ISNULL(@SiAccCodeBook,'')<>''
-        SET @AccFilter = ' AND cBook.SiAccCodeBook IN (SELECT SiSel FROM dbo.Tss_StdStringSiFindUdf(''' + @SiAccCodeBook + '''))'
-
-    DECLARE @TafFilter VARCHAR(1000)=''
-    IF EXISTS (SELECT 1 FROM #Taf)
-        SET @TafFilter = ' AND EXISTS (SELECT 1 FROM #Taf t WHERE (t.TafType=0 AND vDet.SiPubPersonsSpec1=t.SiTaf) OR (t.TafType=1 AND vDet.SiPubCostCenter1=t.SiTaf) OR (t.TafType=2 AND vDet.SiPubProjects1=t.SiTaf))'
-    ELSE IF ISNULL(@SiSelected,'')<>'' AND @TafName IS NOT NULL
-        SET @TafFilter = ' AND vDet.' + @TafName + ' = ' + @SiSelected
-
-    DECLARE @AccAllDocs SMALLINT = dbo.Tss_StdFindSystemParamValue('AccAllDocs')
-
-    DECLARE @HiddenFilter VARCHAR(500)
-    IF dbo.Tss_StdFindIfUserIsInGroup(@SiUser,'AccStar') = 1
-        SET @HiddenFilter = ''
-    ELSE
-        SET @HiddenFilter = ' AND (vDet.Sta_IsHidden = 0 OR vDet.Sta_IsHidden IS NULL) '
-
-    SELECT SiAccFinancePeriodToPlace INTO #TempTable FROM dbo.Tss_AccFinancePeriodToPlace
-    WHERE SiPubSubLocations IN (SELECT * FROM dbo.Tss_StdStringSiFindUdf(@SiPubSubLocations))
-
-    CREATE TABLE #TmpVchTaf (
-        SiAccVoucher_Hd NUMERIC NULL,
-        Dat_VhedDate VARCHAR(10) NULL,
-        Num_VDetRow INT NULL,
-        Des_VdetDesc NVARCHAR(4000) NULL,
-        Num_VdetDebtAmount BIGINT NULL,
-        Num_VdetCreditAmount BIGINT NULL,
-        Num_VhedFinalNo DECIMAL(18,0) NULL,
-        Num_VhedSubNo NUMERIC(18,0) NULL,
-        Cod_AccountCode VARCHAR(50) NULL,
-        Des_AccountDesc NVARCHAR(200) NULL,
-        TafCode VARCHAR(50) NULL,
-        TafName NVARCHAR(401) NULL
-    )
-
-    DECLARE @StatusFilter VARCHAR(100)=CASE WHEN @AccAllDocs=0 THEN 'vHed.Sta_VochStatus >= 3 AND vHed.Sta_VochStatus <> 5 AND ' ELSE 'vHed.Sta_VochStatus >= 3 AND ' END
-
-    DECLARE @SqlTxt NVARCHAR(MAX)=N'
-    SELECT
-        vHed.SiAccVoucher_Hd,
-        vHed.Dat_VhedDate,
-        vDet.Num_VDetRow,
-        Des_VdetDesc = CAST(CASE WHEN Tss_AccVoucherType.Sta_VoucherTypeGroup IN (4,5)
-            THEN ISNULL(vDet.Des_VdetDesc,'''')
-            ELSE vDet.Des_VdetDesc
-        END AS NVARCHAR(4000)),
-        CAST(vDet.Num_VdetDebtAmount AS BIGINT) AS Num_VdetDebtAmount,
-        CAST(vDet.Num_VdetCreditAmount AS BIGINT) AS Num_VdetCreditAmount,
-        CAST(vHed.Num_VhedFinalNo AS DECIMAL(18,0)) AS Num_VhedFinalNo,
-        CAST(vHed.SiAccVoucher_Hd AS NUMERIC(18,0)) AS Num_VhedSubNo,
-        CAST(cBook.Cod_AccountCode AS VARCHAR(50)) AS Cod_AccountCode,
-        CAST(cBook.Des_AccountDesc AS NVARCHAR(200)) AS Des_AccountDesc,
-        CAST(COALESCE(pv.Cod_PubPersonCode, cc.Cod_CostCenterCode, pr.Cod_ProjectsCode, '''') AS VARCHAR(50)) AS TafCode,
-        CAST(COALESCE(pv.Des_FullName, cc.Des_CostCenterName, pr.Des_ProjectsThemeDesc, '''') AS NVARCHAR(401)) AS TafName
-    FROM Tss_AccCodeBook cBook
-    INNER JOIN Tss_AccVoucher_Dt vDet ON cBook.SiAccCodeBook = vDet.SiAccCodeBook
-    INNER JOIN Tss_AccVoucher_Hd vHed ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd
-    INNER JOIN Tss_AccVoucherType ON vHed.SiAccVoucherType = Tss_AccVoucherType.SiAccVoucherType
-    LEFT JOIN Tss_PubPersonsViw pv ON vDet.SiPubPersonsSpec1 = pv.SiPubPersonsSpec
-    LEFT JOIN Tss_PubCostCenter cc ON vDet.SiPubCostCenter1 = cc.SiPubCostCenter
-    LEFT JOIN Tss_PubProjects pr ON vDet.SiPubProjects1 = pr.SiPubProjects
-    WHERE ' + @StatusFilter + N'
-        vHed.SiAccFinancePeriodToPlace IN (SELECT SiAccFinancePeriodToPlace FROM #TempTable)
-        AND vHed.Dat_VhedDate BETWEEN ''' + @DsFromDate + N''' AND ''' + @DsToDate + N'''
-        ' + @AccFilter + N'
-        ' + @TafFilter + N'
-        ' + @HiddenFilter + N'
-        ' + @WhType
-
-    DECLARE @InsertSql NVARCHAR(MAX) = N'
-    INSERT INTO #TmpVchTaf
-    SELECT * FROM (' + @SqlTxt + N') AS Ccc
-    ' + @InternalWhere + N'
-    ' + @Where + N'
-    ' + @Order
-
-    BEGIN TRY
-        EXEC sp_executesql @InsertSql
-    END TRY
-    BEGIN CATCH
-        PRINT 'Error inserting into #TmpVchTaf: ' + ERROR_MESSAGE()
-    END CATCH
-
-    CREATE TABLE #TmpVchTafMandeh (
-        Num_VdetDebtAmount BIGINT NULL,
-        Num_VdetCreditAmount BIGINT NULL
-    )
-
-    DECLARE @SqlTxtMandeh NVARCHAR(MAX)=N'
-    SELECT
-        CAST(SUM(vDet.Num_VdetDebtAmount) AS BIGINT) AS Num_VdetDebtAmount,
-        CAST(SUM(vDet.Num_VdetCreditAmount) AS BIGINT) AS Num_VdetCreditAmount
-    FROM Tss_AccCodeBook cBook
-    INNER JOIN Tss_AccVoucher_Dt vDet ON cBook.SiAccCodeBook = vDet.SiAccCodeBook
-    INNER JOIN Tss_AccVoucher_Hd vHed ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd
-    WHERE ' + @StatusFilter + N'
-        vHed.SiAccFinancePeriodToPlace IN (SELECT SiAccFinancePeriodToPlace FROM #TempTable)
-        AND vHed.Dat_VhedDate BETWEEN ''1385/01/01'' AND ''' + dbo.Tss_StdOneDayDecUdf(@DsFromDate) + N'''
-        ' + @AccFilter + N'
-        ' + @TafFilter + N'
-        ' + @HiddenFilter + N'
-        ' + @WhType
-
-    DECLARE @InsertMandehSql NVARCHAR(MAX) = N'
-    INSERT INTO #TmpVchTafMandeh
-    SELECT * FROM (' + @SqlTxtMandeh + N') AS Ccc'
-
-    BEGIN TRY
-        EXEC sp_executesql @InsertMandehSql
-    END TRY
-    BEGIN CATCH
-        PRINT 'Error inserting into #TmpVchTafMandeh: ' + ERROR_MESSAGE()
-    END CATCH
-
-    CREATE TABLE #TmpVchTafBaBiMandeh (
-        SiAccVoucher_Hd NUMERIC NULL,
-        Dat_VhedDate VARCHAR(10) NULL,
-        Num_VDetRow INT NULL,
-        Des_VdetDesc NVARCHAR(4000) NULL,
-        Num_VdetDebtAmount BIGINT NULL,
-        Num_VdetCreditAmount BIGINT NULL,
-        Num_VhedFinalNo DECIMAL(18,0) NULL,
-        Num_VhedSubNo NUMERIC(18,0) NULL,
-        Cod_AccountCode VARCHAR(50) NULL,
-        Des_AccountDesc NVARCHAR(200) NULL,
-        TafCode VARCHAR(50) NULL,
-        TafName NVARCHAR(401) NULL
-    )
-
-    DECLARE @SqlTxtBaBiMandeh NVARCHAR(MAX)
-    IF @StaMandehOrNot = 1
-    BEGIN
-        SET @SqlTxtBaBiMandeh = N'
-        SELECT
-            CAST(0 AS NUMERIC) AS SiAccVoucher_Hd,
-            CAST('''' AS VARCHAR(10)) AS Dat_VhedDate,
-            0 AS Num_VDetRow,
-            CAST(N''مانده از قبل'' AS NVARCHAR(4000)) AS Des_VdetDesc,
-            CAST(ISNULL(Num_VdetDebtAmount, 0) AS BIGINT) AS Num_VdetDebtAmount,
-            CAST(ISNULL(Num_VdetCreditAmount, 0) AS BIGINT) AS Num_VdetCreditAmount,
-            CAST(0 AS DECIMAL(18,0)) AS Num_VhedFinalNo,
-            CAST(0 AS NUMERIC(18,0)) AS Num_VhedSubNo,
-            CAST('''' AS VARCHAR(50)) AS Cod_AccountCode,
-            CAST('''' AS NVARCHAR(200)) AS Des_AccountDesc,
-            CAST('''' AS VARCHAR(50)) AS TafCode,
-            CAST('''' AS NVARCHAR(401)) AS TafName
-        FROM #TmpVchTafMandeh
-        UNION ALL
-        SELECT
-            SiAccVoucher_Hd, Dat_VhedDate, Num_VDetRow, Des_VdetDesc,
-            Num_VdetDebtAmount, Num_VdetCreditAmount, Num_VhedFinalNo, Num_VhedSubNo,
-            Cod_AccountCode, Des_AccountDesc, TafCode, TafName
-        FROM #TmpVchTaf'
-    END
-    ELSE
-    BEGIN
-        SET @SqlTxtBaBiMandeh = N'
-        SELECT
-            SiAccVoucher_Hd, Dat_VhedDate, Num_VDetRow, Des_VdetDesc,
-            Num_VdetDebtAmount, Num_VdetCreditAmount, Num_VhedFinalNo, Num_VhedSubNo,
-            Cod_AccountCode, Des_AccountDesc, TafCode, TafName
-        FROM #TmpVchTaf'
-    END
-
-    DECLARE @InsertCombineSql NVARCHAR(MAX) = N'
-    INSERT INTO #TmpVchTafBaBiMandeh
-    SELECT * FROM (' + @SqlTxtBaBiMandeh + N') AS Ccc
-    ' + @InternalWhere + N'
-    ' + @Where + N'
-    ' + @Order
-
-    BEGIN TRY
-        EXEC sp_executesql @InsertCombineSql
-    END TRY
-    BEGIN CATCH
-        PRINT 'Error inserting into #TmpVchTafBaBiMandeh: ' + ERROR_MESSAGE()
-    END CATCH
-
-    ;WITH FinalData AS (
-        SELECT
-            CAST(ROW_NUMBER() OVER (ORDER BY Dat_VhedDate, SiAccVoucher_Hd, Num_VDetRow) AS DECIMAL(18,0)) AS MyId,
-            SiAccVoucher_Hd,
-            CAST(Num_VhedFinalNo AS DECIMAL(18,0)) AS Num_VhedFinalNo,
-            CAST(Num_VhedSubNo AS NUMERIC(18,0)) AS Num_VhedSubNo,
-            Dat_VhedDate,
-            LEFT(Dat_VhedDate, 7) AS Dat_VhedDateMonth,
-            Num_VDetRow,
-            Des_VdetDesc,
-            CAST(Num_VdetDebtAmount AS BIGINT) AS Num_VdetDebtAmount,
-            CAST(Num_VdetCreditAmount AS BIGINT) AS Num_VdetCreditAmount,
-            CAST(Num_VdetDebtAmount - Num_VdetCreditAmount AS BIGINT) AS Acc_Rest,
-            Cod_AccountCode, Des_AccountDesc, TafCode, TafName
-        FROM #TmpVchTafBaBiMandeh
-    ),
-    RunningSum AS (
-        SELECT *, SUM(Acc_Rest) OVER (ORDER BY MyId ROWS UNBOUNDED PRECEDING) AS Acc_Rest_Sum
-        FROM FinalData
-    )
-    SELECT
-        MyId, SiAccVoucher_Hd, Num_VhedFinalNo, Num_VhedSubNo, Dat_VhedDate, Dat_VhedDateMonth,
-        Num_VDetRow, Des_VdetDesc, Num_VdetDebtAmount, Num_VdetCreditAmount, Acc_Rest, Acc_Rest_Sum,
-        Cod_AccountCode, Des_AccountDesc, TafCode, TafName
-    FROM RunningSum
-    ORDER BY MyId
-
-    DROP TABLE IF EXISTS #TempTable
-    DROP TABLE IF EXISTS #TmpVchTaf
-    DROP TABLE IF EXISTS #TmpVchTafMandeh
-    DROP TABLE IF EXISTS #TmpVchTafBaBiMandeh
-    DROP TABLE IF EXISTS #Pfx
-    DROP TABLE IF EXISTS #Taf
-END
-
-GO
-
-alter proc Tss_RapFrmRecievedChequeRepRStpAll
-(
-    @SiPubSubLocations numeric=0,
-    @SiRapCashDefine numeric=0,
-    @SiPubPersonsSpec numeric=0,
-    @GhabzNo varchar(50)='',
-    @RegDate varchar(10)='1404/01/01',
-    @RegDate2 varchar(10)='1404/12/29',
-    @UsanceDate varchar(10)='',
-    @UsanceDate2 varchar(10)='',
-    @Dat_RapReceivedChequeVosoolDate varchar(10)='',
-    @Dat_RapReceivedChequeVosoolDate2 varchar(10)='',
-    @Dat_RapReceivedChequeBargashtDate varchar(10)='',
-    @Dat_RapReceivedChequeBargashtDate2 varchar(10)='',
-    @Dat_RapReceivedChequeToPerDate varchar(10)='',
-    @Dat_RapReceivedChequeToPerDate2 varchar(10)='',
-    @Dat_RapReceivedChequeToBankDate varchar(10)='',
-    @Dat_RapReceivedChequeToBankDate2 varchar(10)='',
-    @Dat_RapReceivedChequeHoghughiDate varchar(10)='',
-    @Dat_RapReceivedChequeHoghughiDate2 varchar(10)='',
-    @Dat_RapReceivedChequeCancelDate varchar(10)='',
-    @Dat_RapReceivedChequeCancelDate2 varchar(10)='',
-    @Dat_EsterdadToPer varchar(10)='',
-    @Dat_EsterdadToPer2 varchar(10)='',
-    @Dat_EsterdadToCashier varchar(10)='',
-    @Dat_EsterdadToCashier2 varchar(10)='',
-    @Dat_RapReceivedChequeToAgainDate varchar(10)='',
-    @Dat_RapReceivedChequeToAgainDate2 varchar(10)='',
-    @Sta_ChekRecieptMainOrNot SmallInt=0,
-    @Sta_RapReceivedChequeState varchar(500)='1',
-    @SiCheks varchar(8000)='',
-    @StaDateFilter SmallInt=0,
-    @SiUser numeric=1,
-    @SiToPer varchar(1000)='',
-    @SiRelatedPer varchar(1000)='',
-    @SayadiRegistered char(1)='0',
-    @NotSayadiRegistered char(1)='0',
-    @IsElectronic char(1)='0',
-	@StaSumPers smallint=0
-)
-as
-
-declare    
-    @SayadiSql varchar(1000)
-
--- صیادی ثبت شده: مقدار معتبر و بزرگتر از صفر داشته باشد
-if @SayadiRegistered='1' and @NotSayadiRegistered = '0'
-    Set @SayadiSql = 'AND (ISNULL(NULLIF(LTRIM(RTRIM(cheks1.Des_ReceivedChequeSayadiNationalCode)), ''''), ''0'') > ''0'')'
-
--- صیادی ثبت نشده: مقدار خالی، NULL یا صفر باشد
-if @SayadiRegistered='0' and @NotSayadiRegistered = '1'
-    Set @SayadiSql = 'AND (ISNULL(NULLIF(LTRIM(RTRIM(cheks1.Des_ReceivedChequeSayadiNationalCode)), ''''), ''0'') = ''0'')'
-
-    if @SayadiRegistered='1' and @NotSayadiRegistered = '1'
-        Set @SayadiSql = ''
-
-    if @SayadiRegistered='0' and @NotSayadiRegistered = '0'
-        Set @SayadiSql = ''
-
-    if @IsElectronic='1' 
-        Set @SayadiSql = 'AND (isnull(cheks1.Sta_IsChecqueElectronic,''0'')=''1'')'
-
-if @GhabzNo=''
-Begin
-	Declare
-		@SqlText varchar(8000),
-		@Whr varchar(8000)
-	
-	-- Check if aggregation is needed
-	IF @StaSumPers = 1
-	BEGIN
-		Set @SqlText =
-		'SELECT 
-			CAST(NULL AS varchar(50)) AS GhabzNo,
-			CAST(NULL AS varchar(200)) AS BankName,
-			cheks1.GiverCode,
-			cheks1.GiverName,
-			CAST(NULL AS varchar(1)) AS RecieverCode,
-			CAST(NULL AS varchar(1)) AS RecieverName,
-			CAST(NULL AS varchar(10)) AS RegDate,
-			CAST(NULL AS varchar(10)) AS UsanceDate,
-			SUM(cheks1.ChequeAmount) AS ChequeAmount,
-			CAST(NULL AS varchar(50)) AS BankBranchCode,
-			CAST(NULL AS varchar(50)) AS ChequeSerial,
-			CAST(NULL AS varchar(500)) AS Tozihat,
-			CAST(NULL AS varchar(1500)) AS RecieptTozih,
-			CAST(NULL AS smallint) AS Sta_ChekRecieptMainOrNot,
-			CAST(NULL AS numeric(18,0)) AS SiRapReceivedCheque,
-			CAST(NULL AS varchar(50)) AS ContractNo,
-			CAST(NULL AS numeric(18,0)) AS SiPubPersonsSpec,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeCngDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeVosoolDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeBargashtDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeCancelDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToPerDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToBankDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeHoghughiDate,
-			CAST(NULL AS numeric(18,0)) AS SiPubSubLocations,
-			CAST(NULL AS smallint) AS Sta_RapReceivedChequeState,
-			CAST(NULL AS numeric(18,0)) AS SiRapCashDefine,
-			CAST(NULL AS numeric(18,0)) AS SiPubCustomCodes,
-			CAST(NULL AS varchar(50)) AS Cod_PubPersonCode,
-			CAST(NULL AS varchar(401)) AS Des_FullName,
-			CAST(NULL AS varchar(50)) AS GirandehCode,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToAgainDate,
-			CAST(NULL AS varchar(50)) AS Dat_EsterdadToPer,
-			CAST(NULL AS varchar(50)) AS Dat_EsterdadToCashier,
-			CAST(NULL AS varchar(401)) AS GirandehDesc,
-			CAST(NULL AS varchar(50)) AS Des_ReceivedChequeSayadiCode,
-			CAST(NULL AS varchar(50)) AS Des_ReceivedChequeSayadiNationalCode,
-			CAST(NULL AS smallint) AS Sta_IsChecqueElectronic
-		FROM         
-			Tss_RapRecCheckGhabzRep1Vw cheks1 LEFT OUTER JOIN
-			Tss_RapRecCheckGhabzRep2Vw cheks2 ON cheks1.SiRapReceivedCheque = cheks2.SiRapReceivedCheque
-		'
-	END
-	ELSE
-	BEGIN
-		Set @SqlText =
-		'select * from (SELECT   distinct  
-			cheks1.GhabzNo, 
-			cheks1.BankName, 
-			cheks1.GiverCode, 
-			cheks1.GiverName, 
-			'''' RecieverCode, 
-			'''' RecieverName, 
-			cheks1.RegDate, 
-			cheks1.UsanceDate, 
-			cheks1.ChequeAmount, 
-			cheks1.BankBranchCode, 
-			cheks1.ChequeSerial, 
-			cheks1.Tozihat, 
-			cheks1.RecieptTozih, 
-			cheks1.Sta_ChekRecieptMainOrNot, 
-			cheks1.SiRapReceivedCheque, 
-			cheks2.Cod_SaleAgreement AS ContractNo, 
-			cheks1.SiPubPersonsSpec, 
-			cheks1.Dat_RapReceivedChequeCngDate, 
-			cheks1.Dat_RapReceivedChequeVosoolDate, 
-			cheks1.Dat_RapReceivedChequeBargashtDate, 
-			cheks1.Dat_RapReceivedChequeCancelDate, 
-			cheks1.Dat_RapReceivedChequeToPerDate, 
-			cheks1.Dat_RapReceivedChequeToBankDate, 
-			cheks1.Dat_RapReceivedChequeHoghughiDate,
-			cheks1.SiPubSubLocations, 
-			cheks1.Sta_RapReceivedChequeState, 
-			cheks1.SiRapCashDefine, 
-			cheks1.SiPubCustomCodes, 
-			cheks1.Cod_PubPersonCode, 
-			cheks1.Des_FullName, 
-			cheks1.GirandehCode, 
-			cheks1.Dat_RapReceivedChequeToAgainDate, 
-			cheks1.Dat_EsterdadToPer, 
-			cheks1.Dat_EsterdadToCashier, 
-			cheks1.GirandehDesc,
-			cheks1.Des_ReceivedChequeSayadiCode,
-			cheks1.Des_ReceivedChequeSayadiNationalCode,
-			cheks1.Sta_IsChecqueElectronic
-		FROM         
-			Tss_RapRecCheckGhabzRep1Vw cheks1 LEFT OUTER JOIN
-			Tss_RapRecCheckGhabzRep2Vw cheks2 ON cheks1.SiRapReceivedCheque = cheks2.SiRapReceivedCheque
-		'
-	END
-
-	Set @Whr = ''
-
-	if isnull(@SiPubSubLocations,0)<>0	
-	Begin
-		Set @Whr = ' WHERE     
-				     (cheks1.SiPubSubLocations = '+convert(varchar,@SiPubSubLocations)+') '
-		if isnull(@SiPubPersonsSpec,0)<>0 
-		Set @Whr = @Whr + ' AND  (cheks1.SiPubPersonsSpec = '+convert(varchar,@SiPubPersonsSpec)+') '
-	End	 
-	Else
-	Begin
-		if isnull(@SiPubPersonsSpec,0)<>0 
-			Set @Whr = @Whr + ' Where  (cheks1.SiPubPersonsSpec = '+convert(varchar,@SiPubPersonsSpec)+') '
-		Else
-			Set @Whr = @Whr + ' Where '
-	End
-
-	if @SiToPer<>''
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-		Set @Whr = @Whr + ' AND (cheks1.SiRapReceivedCheque in (SELECT SiRapReceivedCheque FROM Tss_RapRecChequeToBank WHERE (SiPubPersonsSpec IN (SELECT Sisel FROM dbo.Tss_StdStringSiFindUdf('+''''+@SiToPer+''''+')))))'
-	Else
-		Set @Whr = @Whr + ' (cheks1.SiRapReceivedCheque in (SELECT SiRapReceivedCheque FROM Tss_RapRecChequeToBank WHERE (SiPubPersonsSpec IN (SELECT Sisel FROM dbo.Tss_StdStringSiFindUdf('+''''+@SiToPer+''''+')))))'
-	End
-
-	if @SiRelatedPer<>''
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-		Set @Whr = @Whr + ' AND (cheks1.SiPerRelatedSaler in  (SELECT Sisel FROM dbo.Tss_StdStringSiFindUdf('+''''+@SiRelatedPer+''''+')))'
-	Else
-		Set @Whr = @Whr + ' (cheks1.SiPerRelatedSaler in  (SELECT Sisel FROM dbo.Tss_StdStringSiFindUdf('+''''+@SiRelatedPer+''''+')))'
-	End
-
-	if (@Sta_RapReceivedChequeState<>'') and (@Sta_RapReceivedChequeState<>'1')
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-		Set @Whr = @Whr + ' AND (cheks1.Sta_RapReceivedChequeState in (Select Sisel from dbo.Tss_StdStringSiFindUdf('+''''+@Sta_RapReceivedChequeState+''''+')))'
-	Else
-		Set @Whr = @Whr + '  (cheks1.Sta_RapReceivedChequeState in (Select Sisel from dbo.Tss_StdStringSiFindUdf('+''''+@Sta_RapReceivedChequeState+''''+')))'
-	End
-	else
-
-IF (@Sta_RapReceivedChequeState = '1')
-BEGIN
-    DECLARE @Condition NVARCHAR(MAX)
-
-    SET @Condition = 
-        'cheks1.RegDate BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''' ' +
-        'AND (' +
-            '(ISNULL(cheks1.Dat_RapReceivedChequeToPerDate, '''') <> '''' AND ' +
-             'cheks1.Dat_RapReceivedChequeToPerDate NOT BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''') ' +
-            'OR ' +
-            '(ISNULL(cheks1.Dat_RapReceivedChequeToBankDate, '''') <> '''' AND ' +
-             'cheks1.Dat_RapReceivedChequeToBankDate NOT BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''') ' +
-            'OR ' +
-            '(ISNULL(cheks1.Dat_RapReceivedChequeBargashtDate, '''') BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''') ' +
-            'OR ' +
-            '(ISNULL(cheks1.Dat_RapReceivedChequeToAgainDate, '''') BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''')' +
-        ')'
-
-    IF ISNULL(@Whr, '') <> ' Where '
-        SET @Whr = @Whr + ' AND ' + @Condition
-    ELSE
-        SET @Whr = ' Where ' + @Condition
-END
-
-	if @SiCheks<>''
-		Set @Whr = @Whr + ' AND (cheks1.SiRapReceivedCheque in (Select SiSel From dbo.Tss_StdStringSiFindUdf('+''''+@SiCheks+''''+')))'
-
-	if @StaDateFilter=0
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-					Set @Whr = @Whr + ' AND (cheks1.RegDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-			Else
-					Set @Whr = @Whr + ' (cheks1.RegDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-	End
-
-	if @StaDateFilter=1
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-					Set @Whr = @Whr + ' AND (cheks1.UsanceDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-			Else
-					Set @Whr = @Whr + ' (cheks1.UsanceDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-	End
-
-	if @StaDateFilter=2
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeVosoolDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-			Else
-					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeVosoolDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-	End
-
-	if @StaDateFilter=3
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeBargashtDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-			Else
-					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeBargashtDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-	End
-
-	if @StaDateFilter=4
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeToPerDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-			Else
-					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeToPerDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-	End
-
-	if @StaDateFilter=5
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeToBankDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-			Else
-					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeToBankDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-	End
-
-	if @StaDateFilter=6
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeToAgainDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-			Else
-					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeToAgainDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-	End
-
-	if @StaDateFilter=7
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-					Set @Whr = @Whr + ' AND (cheks1.Dat_EsterdadToPer BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-			Else
-					Set @Whr = @Whr + ' (cheks1.Dat_EsterdadToPer BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-	End
-
-	if @StaDateFilter=8
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-					Set @Whr = @Whr + ' AND (cheks1.Dat_EsterdadToCashier BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-			Else
-					Set @Whr = @Whr + ' (cheks1.Dat_EsterdadToCashier BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-	End
-
-    if @SayadiSql <> ''
-        Set @Whr = @Whr + @SayadiSql
-
-	-- Handle ORDER BY for aggregation
-	IF @StaSumPers = 1
-	BEGIN
-		-- Add GROUP BY for GiverCode and GiverName
-		Set @SqlText = @SqlText + @Whr + ' GROUP BY cheks1.GiverCode, cheks1.GiverName ORDER BY cheks1.GiverName'
-	END
-	ELSE
-	BEGIN
-		if @Sta_ChekRecieptMainOrNot = 0	
-			Set @SqlText = @SqlText + @Whr + ') ccc order by UsanceDate'
-		
-		if @Sta_ChekRecieptMainOrNot = 1	
-			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeVosoolDate'
-
-		if @Sta_ChekRecieptMainOrNot = 2	
-			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeBargashtDate'
-
-		if @Sta_ChekRecieptMainOrNot = 3	
-			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeToPerDate'
-
-		if @Sta_ChekRecieptMainOrNot = 4	
-			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeToBankDate'
-
-		if @Sta_ChekRecieptMainOrNot = 5	
-			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeToAgainDate'
-
-		if @Sta_ChekRecieptMainOrNot = 6	
-			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_EsterdadToPer'
-
-		if @Sta_ChekRecieptMainOrNot = 7	
-			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_EsterdadToCashier'
-
-		if @Sta_ChekRecieptMainOrNot = 8	
-			Set @SqlText = @SqlText + @Whr + ') ccc order by RegDate'
-	END
-
-    if @SayadiSql <> ''
-        
-if @Whr<>''
-	Set @Whr = @Whr + ' and  (SiPubSubLocations in  (SELECT DISTINCT 
-		Tss_AccFinancePeriodToPlace.SiPubSubLocations
-	FROM         
-		Tss_AccUserToFinancePeriodAndPlace INNER JOIN
-		Tss_AccFinancePeriodToPlace ON 
-		Tss_AccUserToFinancePeriodAndPlace.SiAccFinancePeriodToPlace = Tss_AccFinancePeriodToPlace.SiAccFinancePeriodToPlace
-	WHERE     
-		(Tss_AccUserToFinancePeriodAndPlace.SiPubPersonsSpec = '+convert(varchar,@SiUser)+')))'
-else
-	Set @Whr = @Whr + ' where  (SiPubSubLocations in  (SELECT DISTINCT 
-		Tss_AccFinancePeriodToPlace.SiPubSubLocations
-	FROM         
-		Tss_AccUserToFinancePeriodAndPlace INNER JOIN
-		Tss_AccFinancePeriodToPlace ON 
-		Tss_AccUserToFinancePeriodAndPlace.SiAccFinancePeriodToPlace = Tss_AccFinancePeriodToPlace.SiAccFinancePeriodToPlace
-	WHERE     
-		(Tss_AccUserToFinancePeriodAndPlace.SiPubPersonsSpec = @'+convert(varchar,@SiUser)+')))'
-		
-	print @SqlText
-	
-	exec(@SqlText)
-End
-Else
-Begin
-	-- Handle the ELSE block when @GhabzNo is not empty
-	IF @StaSumPers = 1
-	BEGIN
-		SELECT 
-			CAST(NULL AS varchar(50)) AS GhabzNo,
-			CAST(NULL AS varchar(200)) AS BankName,
-			cheks1.GiverCode,
-			cheks1.GiverName,
-			CAST(NULL AS varchar(1)) AS RecieverCode,
-			CAST(NULL AS varchar(1)) AS RecieverName,
-			CAST(NULL AS varchar(10)) AS RegDate,
-			CAST(NULL AS varchar(10)) AS UsanceDate,
-			SUM(cheks1.ChequeAmount) AS ChequeAmount,
-			CAST(NULL AS varchar(50)) AS BankBranchCode,
-			CAST(NULL AS varchar(50)) AS ChequeSerial,
-			CAST(NULL AS varchar(500)) AS Tozihat,
-			CAST(NULL AS varchar(1500)) AS RecieptTozih,
-			CAST(NULL AS smallint) AS Sta_ChekRecieptMainOrNot,
-			CAST(NULL AS numeric(18,0)) AS SiRapReceivedCheque,
-			CAST(NULL AS varchar(50)) AS ContractNo,
-			CAST(NULL AS numeric(18,0)) AS SiPubPersonsSpec,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeCngDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeVosoolDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeBargashtDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeCancelDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToPerDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToBankDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeHoghughiDate,
-			CAST(NULL AS numeric(18,0)) AS SiPubSubLocations,
-			CAST(NULL AS smallint) AS Sta_RapReceivedChequeState,
-			CAST(NULL AS numeric(18,0)) AS SiRapCashDefine,
-			CAST(NULL AS numeric(18,0)) AS SiPubCustomCodes,
-			CAST(NULL AS varchar(50)) AS Cod_PubPersonCode,
-			CAST(NULL AS varchar(401)) AS Des_FullName,
-			CAST(NULL AS varchar(50)) AS GirandehCode,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToAgainDate,
-			CAST(NULL AS varchar(50)) AS Dat_EsterdadToPer,
-			CAST(NULL AS varchar(50)) AS Dat_EsterdadToCashier,
-			CAST(NULL AS varchar(401)) AS GirandehDesc,
-			CAST(NULL AS varchar(50)) AS Des_ReceivedChequeSayadiCode,
-			CAST(NULL AS varchar(50)) AS Des_ReceivedChequeSayadiNationalCode,
-			CAST(NULL AS smallint) AS Sta_IsChecqueElectronic
-		FROM         
-			Tss_RapRecCheckGhabzRep1Vw cheks1 LEFT OUTER JOIN
-			Tss_RapRecCheckGhabzRep2Vw cheks2 ON cheks1.SiRapReceivedCheque = cheks2.SiRapReceivedCheque
-		WHERE   
-			(cheks1.Sta_CheckToBankState <> 4) and
-			(cheks1.Sta_CheckToBankState <> 3) and 	
-			(cheks1.GhabzNo = @GhabzNo) and
-			(cheks1.Sta_ChekRecieptMainOrNot = @Sta_ChekRecieptMainOrNot )
-		GROUP BY cheks1.GiverCode, cheks1.GiverName
-		ORDER BY cheks1.GiverName
-	END
-	ELSE
-	BEGIN
-		SELECT    distinct 
-			cheks1.GhabzNo, 
-			cheks1.BankName, 
-			'' GiverCode, 
-			'' GiverName, 
-			cheks1.RecieverCode, 
-			cheks1.RecieverName, 
-			cheks1.RegDate, 
-			cheks1.UsanceDate, 
-			cheks1.ChequeAmount, 
-			cheks1.BankBranchCode, 
-			cheks1.ChequeSerial, 
-			cheks1.Tozihat, 
-			cheks1.RecieptTozih, 
-			cheks1.Sta_ChekRecieptMainOrNot, 
-			cheks1.SiRapReceivedCheque, 
-			cheks2.Cod_SaleAgreement AS ContractNo, 
-			cheks1.SiPubPersonsSpec, 
-			cheks1.Dat_RapReceivedChequeCngDate, 
-			cheks1.Dat_RapReceivedChequeVosoolDate, 
-			cheks1.Dat_RapReceivedChequeBargashtDate, 
-			cheks1.Dat_RapReceivedChequeCancelDate, 
-			cheks1.Dat_RapReceivedChequeToPerDate, 
-			cheks1.Dat_RapReceivedChequeToBankDate, 
-			cheks1.Dat_RapReceivedChequeHoghughiDate, 
-			cheks1.SiPubSubLocations, 
-			cheks1.Sta_RapReceivedChequeState, 
-			cheks1.SiRapCashDefine, 
-			cheks1.SiPubCustomCodes, 
-			cheks1.Cod_PubPersonCode, 
-			cheks1.Des_FullName,
-			cheks1.GirandehCode, 
-			cheks1.GirandehDesc,
-			cheks1.Dat_EsterdadToCashier,
-			cheks1.Dat_EsterdadToPer,
-			cheks1.Des_ReceivedChequeSayadiCode,
-			cheks1.Des_ReceivedChequeSayadiNationalCode,
-			cheks1.Dat_RapReceivedChequeToAgainDate,
-			cheks1.Sta_IsChecqueElectronic
-		FROM         
-			Tss_RapRecCheckGhabzRep1Vw cheks1 LEFT OUTER JOIN
-			Tss_RapRecCheckGhabzRep2Vw cheks2 ON cheks1.SiRapReceivedCheque = cheks2.SiRapReceivedCheque
-		WHERE   
-			(cheks1.Sta_CheckToBankState <> 4) and
-			(cheks1.Sta_CheckToBankState <> 3) and 	
-			(cheks1.GhabzNo = @GhabzNo) and
-			(cheks1.Sta_ChekRecieptMainOrNot = @Sta_ChekRecieptMainOrNot )
-	END
-End
+SELECT       dbo.Tss_RapReceivedCheque.Des_RecCheqOurSayadiNationalCode, dbo.Tss_RapReceivedCheque.Cod_RapReceivedChequeCode AS GhabzNo, dbo.Tss_PubCustomCodes.Des_CustomCodesDesc AS BankName, Tss_PubPersonsViw_1.Cod_PubPersonCode AS RecieverCode, 
+                         Tss_PubPersonsViw_1.Des_FullName AS RecieverName, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeEndDate AS UsanceDate, dbo.Tss_RapReceivedCheque.Num_RapReceivedChequeAmount AS ChequeAmount, 
+                         dbo.Tss_RapReceivedCheque.Cod_RapReceivedChqBankCode AS BankBranchCode, dbo.Tss_RapReceivedCheque.Cod_RapReceivedChequeSerial AS ChequeSerial, 
+                         dbo.Tss_RapReceivedCheque.Des_RapReceivedChequeDesc AS Tozihat, dbo.Tss_RapReceivedCheque.Des_RapReceivedChequeRecieptDesc AS RecieptTozih, dbo.Tss_RapReceivedCheque.Sta_ChekRecieptMainOrNot, 
+                         dbo.Tss_RapReceivedCheque.SiRapReceivedCheque, dbo.Tss_RapReceivedCheque.SiPubPersonsSpec, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeCngDate, 
+                         dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeVosoolDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeBargashtDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeCancelDate, 
+                         dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeToPerDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeToBankDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeHoghughiDate, 
+                         dbo.Tss_RapReceivedCheque.SiPubSubLocations, dbo.Tss_RapReceivedCheque.SiRapCashDefine, dbo.Tss_RapReceivedCheque.SiPubCustomCodes, Tss_PubPersonsViw_2.Cod_PubPersonCode AS GiverCode, 
+                         Tss_PubPersonsViw_2.Des_FullName AS GiverName, Tss_PubPersonsViw_2.Cod_PubPersonCode, Tss_PubPersonsViw_2.Des_FullName, dbo.Tss_RapRecChequeToBankVw.Sta_CheckToBankState,
+                             (SELECT        TOP (1) dbo.Tss_PubPersonsViw.Des_FullName
+                                FROM            dbo.Tss_RapRecChequeToBank INNER JOIN
+                                                         dbo.Tss_PubPersonsViw ON dbo.Tss_RapRecChequeToBank.SiPubPersonsSpec = dbo.Tss_PubPersonsViw.SiPubPersonsSpec
+                                WHERE        (dbo.Tss_RapRecChequeToBank.Sta_CheckToBankState < 3) AND (dbo.Tss_RapRecChequeToBank.SiRapReceivedCheque = dbo.Tss_RapReceivedCheque.SiRapReceivedCheque)
+                                ORDER BY dbo.Tss_RapRecChequeToBank.SiRapRecChequeToBank desc) AS GirandehDesc,
+                             (SELECT        TOP (1) Tss_PubPersonsViw_3.Cod_PubPersonCode
+                                FROM            dbo.Tss_RapRecChequeToBank AS Tss_RapRecChequeToBank_1 INNER JOIN
+                                                         dbo.Tss_PubPersonsViw AS Tss_PubPersonsViw_3 ON Tss_RapRecChequeToBank_1.SiPubPersonsSpec = Tss_PubPersonsViw_3.SiPubPersonsSpec
+                                WHERE        (Tss_RapRecChequeToBank_1.Sta_CheckToBankState < 3) AND (Tss_RapRecChequeToBank_1.SiRapReceivedCheque = dbo.Tss_RapReceivedCheque.SiRapReceivedCheque)
+                                ORDER BY Tss_RapRecChequeToBank_1.SiRapRecChequeToBank desc) AS GirandehCode, dbo.Tss_RapReceivedCheque.Dat_EsterdadToPer, dbo.Tss_RapReceivedCheque.Dat_EsterdadToCashier, 
+                         dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeToAgainDate, dbo.Tss_RapReceivedCheque.SiRapRecievedChequeRef_RefrenceHd, dbo.Tss_RapReceivedCheque.SiRapBehalfDefineHd, 
+                         dbo.Tss_RapReceivedCheque.Sta_CalcInReturnRep, dbo.Tss_RapReceivedCheque.Sta_RapReceivedChequeState, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeRegDate AS RegDate, 
+                         Tss_PubPersonsViw_4.Cod_PubPersonCode AS Expr1, Tss_PubPersonsViw_4.Des_FullName AS Expr2, Tss_PubPersonsViw_2.SiPerRelatedSaler,
+                         dbo.Tss_RapReceivedCheque.Des_ReceivedChequeSayadiCode,dbo.Tss_RapReceivedCheque.Des_ReceivedChequeSayadiNationalCode,
+    dbo.Tss_RapReceivedCheque.Sta_IsChecqueElectronic
+FROM            dbo.Tss_PubPersonsViw AS Tss_PubPersonsViw_4 RIGHT OUTER JOIN
+                         dbo.Tss_RapReceivedCheque INNER JOIN
+                         dbo.Tss_RapCashDefine ON dbo.Tss_RapReceivedCheque.SiRapCashDefine = dbo.Tss_RapCashDefine.SiRapCashDefine INNER JOIN
+                         dbo.Tss_RapCashOwners ON dbo.Tss_RapCashDefine.SiRapCashDefine = dbo.Tss_RapCashOwners.SiRapCashDefine INNER JOIN
+                         dbo.Tss_PubPersonsViw AS Tss_PubPersonsViw_1 ON dbo.Tss_RapCashOwners.SiPubPersonsSpec = Tss_PubPersonsViw_1.SiPubPersonsSpec INNER JOIN
+                         dbo.Tss_PubPersonsViw AS Tss_PubPersonsViw_2 ON dbo.Tss_RapReceivedCheque.SiPubPersonsSpec = Tss_PubPersonsViw_2.SiPubPersonsSpec ON 
+                         Tss_PubPersonsViw_4.SiPubPersonsSpec = Tss_PubPersonsViw_2.SiPerRelatedSaler LEFT OUTER JOIN
+                         dbo.Tss_RapRecChequeToBankVw ON dbo.Tss_RapReceivedCheque.SiRapReceivedCheque = dbo.Tss_RapRecChequeToBankVw.SiRapReceivedCheque LEFT OUTER JOIN
+                         dbo.Tss_PubCustomCodes ON dbo.Tss_RapReceivedCheque.SiPubCustomCodes = dbo.Tss_PubCustomCodes.SiPubCustomCodes
+GROUP BY dbo.Tss_PubCustomCodes.Des_CustomCodesDesc, Tss_PubPersonsViw_1.Cod_PubPersonCode, Tss_PubPersonsViw_1.Des_FullName, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeEndDate, 
+                         dbo.Tss_RapReceivedCheque.Num_RapReceivedChequeAmount, dbo.Tss_RapReceivedCheque.Cod_RapReceivedChqBankCode, dbo.Tss_RapReceivedCheque.Cod_RapReceivedChequeSerial, 
+                         dbo.Tss_RapReceivedCheque.SiRapReceivedCheque, dbo.Tss_RapReceivedCheque.Cod_RapReceivedChequeCode, Tss_PubPersonsViw_1.Des_FullName, Tss_PubPersonsViw_1.Cod_PubPersonCode, 
+                         dbo.Tss_RapReceivedCheque.Des_RapReceivedChequeDesc, dbo.Tss_RapReceivedCheque.Des_RapReceivedChequeRecieptDesc, dbo.Tss_RapReceivedCheque.Sta_ChekRecieptMainOrNot, 
+                         dbo.Tss_RapReceivedCheque.SiPubPersonsSpec, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeCngDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeVosoolDate, 
+                         dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeBargashtDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeCancelDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeToPerDate, 
+                         dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeToBankDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeHoghughiDate, dbo.Tss_RapReceivedCheque.SiPubSubLocations, 
+                         dbo.Tss_RapReceivedCheque.SiRapCashDefine, dbo.Tss_RapReceivedCheque.SiPubCustomCodes, Tss_PubPersonsViw_2.Cod_PubPersonCode, Tss_PubPersonsViw_2.Des_FullName, 
+                         Tss_PubPersonsViw_2.Cod_PubPersonCode, Tss_PubPersonsViw_2.Des_FullName, dbo.Tss_RapRecChequeToBankVw.Sta_CheckToBankState, dbo.Tss_RapReceivedCheque.Dat_EsterdadToPer, 
+                         dbo.Tss_RapReceivedCheque.Dat_EsterdadToCashier, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeToAgainDate, dbo.Tss_RapReceivedCheque.SiRapRecievedChequeRef_RefrenceHd, 
+                         dbo.Tss_RapReceivedCheque.SiRapBehalfDefineHd, dbo.Tss_RapReceivedCheque.Sta_CalcInReturnRep, dbo.Tss_RapReceivedCheque.Sta_RapReceivedChequeState, 
+                         dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeRegDate, Tss_PubPersonsViw_4.Cod_PubPersonCode, Tss_PubPersonsViw_4.Des_FullName, 
+                         Tss_PubPersonsViw_2.SiPerRelatedSaler, dbo.Tss_RapReceivedCheque.Des_ReceivedChequeSayadiCode,
+                         dbo.Tss_RapReceivedCheque.Des_ReceivedChequeSayadiNationalCode, dbo.Tss_RapReceivedCheque.Sta_IsChecqueElectronic, dbo.Tss_RapReceivedCheque.Des_RecCheqOurSayadiNationalCode
 
 
 GO
-
 alter proc Tss_RapFrmRecievedChequeRepRStpAll
 (
     @SiPubSubLocations numeric=0,
@@ -9245,7 +7643,7 @@ if @IsSayadiInCartable='1'
 
 
 if @NotSayadiInCartable='1' 
-    Set @SayadiSql = 'AND (isnull(cheks1.Sta_IsChecqueElectronic,''0'')=''1'')'
+    Set @SayadiSql = 'AND (isnull(cheks1.Sta_SayadiReg,''0'')=''0'')'
 
 if @GhabzNo=''
 Begin
@@ -9295,6 +7693,7 @@ Begin
 			CAST(NULL AS varchar(401)) AS GirandehDesc,
 			CAST(NULL AS varchar(50)) AS Des_ReceivedChequeSayadiCode,
 			CAST(NULL AS varchar(50)) AS Des_ReceivedChequeSayadiNationalCode,
+			CAST(NULL AS varchar(50)) AS Des_RecCheqOurSayadiNationalCode,
 			CAST(NULL AS smallint) AS Sta_IsChecqueElectronic
 		FROM         
 			Tss_RapRecCheckGhabzRep1Vw cheks1 LEFT OUTER JOIN
@@ -9342,6 +7741,7 @@ Begin
 			cheks1.GirandehDesc,
 			cheks1.Des_ReceivedChequeSayadiCode,
 			cheks1.Des_ReceivedChequeSayadiNationalCode,
+			cheks1.Des_RecCheqOurSayadiNationalCode,
 			cheks1.Sta_IsChecqueElectronic
 		FROM         
 			Tss_RapRecCheckGhabzRep1Vw cheks1 LEFT OUTER JOIN
@@ -9663,533 +8063,1214 @@ End
 
 GO
 
-alter VIEW Tss_RapRecCheckGhabzRep1Vw
-AS
-SELECT       dbo.Tss_RapReceivedCheque.Des_RecCheqOurSayadiNationalCode, dbo.Tss_RapReceivedCheque.Cod_RapReceivedChequeCode AS GhabzNo, dbo.Tss_PubCustomCodes.Des_CustomCodesDesc AS BankName, Tss_PubPersonsViw_1.Cod_PubPersonCode AS RecieverCode, 
-                         Tss_PubPersonsViw_1.Des_FullName AS RecieverName, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeEndDate AS UsanceDate, dbo.Tss_RapReceivedCheque.Num_RapReceivedChequeAmount AS ChequeAmount, 
-                         dbo.Tss_RapReceivedCheque.Cod_RapReceivedChqBankCode AS BankBranchCode, dbo.Tss_RapReceivedCheque.Cod_RapReceivedChequeSerial AS ChequeSerial, 
-                         dbo.Tss_RapReceivedCheque.Des_RapReceivedChequeDesc AS Tozihat, dbo.Tss_RapReceivedCheque.Des_RapReceivedChequeRecieptDesc AS RecieptTozih, dbo.Tss_RapReceivedCheque.Sta_ChekRecieptMainOrNot, 
-                         dbo.Tss_RapReceivedCheque.SiRapReceivedCheque, dbo.Tss_RapReceivedCheque.SiPubPersonsSpec, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeCngDate, 
-                         dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeVosoolDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeBargashtDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeCancelDate, 
-                         dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeToPerDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeToBankDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeHoghughiDate, 
-                         dbo.Tss_RapReceivedCheque.SiPubSubLocations, dbo.Tss_RapReceivedCheque.SiRapCashDefine, dbo.Tss_RapReceivedCheque.SiPubCustomCodes, Tss_PubPersonsViw_2.Cod_PubPersonCode AS GiverCode, 
-                         Tss_PubPersonsViw_2.Des_FullName AS GiverName, Tss_PubPersonsViw_2.Cod_PubPersonCode, Tss_PubPersonsViw_2.Des_FullName, dbo.Tss_RapRecChequeToBankVw.Sta_CheckToBankState,
-                             (SELECT        TOP (1) dbo.Tss_PubPersonsViw.Des_FullName
-                                FROM            dbo.Tss_RapRecChequeToBank INNER JOIN
-                                                         dbo.Tss_PubPersonsViw ON dbo.Tss_RapRecChequeToBank.SiPubPersonsSpec = dbo.Tss_PubPersonsViw.SiPubPersonsSpec
-                                WHERE        (dbo.Tss_RapRecChequeToBank.Sta_CheckToBankState < 3) AND (dbo.Tss_RapRecChequeToBank.SiRapReceivedCheque = dbo.Tss_RapReceivedCheque.SiRapReceivedCheque)
-                                ORDER BY dbo.Tss_RapRecChequeToBank.SiRapRecChequeToBank desc) AS GirandehDesc,
-                             (SELECT        TOP (1) Tss_PubPersonsViw_3.Cod_PubPersonCode
-                                FROM            dbo.Tss_RapRecChequeToBank AS Tss_RapRecChequeToBank_1 INNER JOIN
-                                                         dbo.Tss_PubPersonsViw AS Tss_PubPersonsViw_3 ON Tss_RapRecChequeToBank_1.SiPubPersonsSpec = Tss_PubPersonsViw_3.SiPubPersonsSpec
-                                WHERE        (Tss_RapRecChequeToBank_1.Sta_CheckToBankState < 3) AND (Tss_RapRecChequeToBank_1.SiRapReceivedCheque = dbo.Tss_RapReceivedCheque.SiRapReceivedCheque)
-                                ORDER BY Tss_RapRecChequeToBank_1.SiRapRecChequeToBank desc) AS GirandehCode, dbo.Tss_RapReceivedCheque.Dat_EsterdadToPer, dbo.Tss_RapReceivedCheque.Dat_EsterdadToCashier, 
-                         dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeToAgainDate, dbo.Tss_RapReceivedCheque.SiRapRecievedChequeRef_RefrenceHd, dbo.Tss_RapReceivedCheque.SiRapBehalfDefineHd, 
-                         dbo.Tss_RapReceivedCheque.Sta_CalcInReturnRep, dbo.Tss_RapReceivedCheque.Sta_RapReceivedChequeState, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeRegDate AS RegDate, 
-                         Tss_PubPersonsViw_4.Cod_PubPersonCode AS Expr1, Tss_PubPersonsViw_4.Des_FullName AS Expr2, Tss_PubPersonsViw_2.SiPerRelatedSaler,
-                         dbo.Tss_RapReceivedCheque.Des_ReceivedChequeSayadiCode,dbo.Tss_RapReceivedCheque.Des_ReceivedChequeSayadiNationalCode,
-    dbo.Tss_RapReceivedCheque.Sta_IsChecqueElectronic
-FROM            dbo.Tss_PubPersonsViw AS Tss_PubPersonsViw_4 RIGHT OUTER JOIN
-                         dbo.Tss_RapReceivedCheque INNER JOIN
-                         dbo.Tss_RapCashDefine ON dbo.Tss_RapReceivedCheque.SiRapCashDefine = dbo.Tss_RapCashDefine.SiRapCashDefine INNER JOIN
-                         dbo.Tss_RapCashOwners ON dbo.Tss_RapCashDefine.SiRapCashDefine = dbo.Tss_RapCashOwners.SiRapCashDefine INNER JOIN
-                         dbo.Tss_PubPersonsViw AS Tss_PubPersonsViw_1 ON dbo.Tss_RapCashOwners.SiPubPersonsSpec = Tss_PubPersonsViw_1.SiPubPersonsSpec INNER JOIN
-                         dbo.Tss_PubPersonsViw AS Tss_PubPersonsViw_2 ON dbo.Tss_RapReceivedCheque.SiPubPersonsSpec = Tss_PubPersonsViw_2.SiPubPersonsSpec ON 
-                         Tss_PubPersonsViw_4.SiPubPersonsSpec = Tss_PubPersonsViw_2.SiPerRelatedSaler LEFT OUTER JOIN
-                         dbo.Tss_RapRecChequeToBankVw ON dbo.Tss_RapReceivedCheque.SiRapReceivedCheque = dbo.Tss_RapRecChequeToBankVw.SiRapReceivedCheque LEFT OUTER JOIN
-                         dbo.Tss_PubCustomCodes ON dbo.Tss_RapReceivedCheque.SiPubCustomCodes = dbo.Tss_PubCustomCodes.SiPubCustomCodes
-GROUP BY dbo.Tss_PubCustomCodes.Des_CustomCodesDesc, Tss_PubPersonsViw_1.Cod_PubPersonCode, Tss_PubPersonsViw_1.Des_FullName, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeEndDate, 
-                         dbo.Tss_RapReceivedCheque.Num_RapReceivedChequeAmount, dbo.Tss_RapReceivedCheque.Cod_RapReceivedChqBankCode, dbo.Tss_RapReceivedCheque.Cod_RapReceivedChequeSerial, 
-                         dbo.Tss_RapReceivedCheque.SiRapReceivedCheque, dbo.Tss_RapReceivedCheque.Cod_RapReceivedChequeCode, Tss_PubPersonsViw_1.Des_FullName, Tss_PubPersonsViw_1.Cod_PubPersonCode, 
-                         dbo.Tss_RapReceivedCheque.Des_RapReceivedChequeDesc, dbo.Tss_RapReceivedCheque.Des_RapReceivedChequeRecieptDesc, dbo.Tss_RapReceivedCheque.Sta_ChekRecieptMainOrNot, 
-                         dbo.Tss_RapReceivedCheque.SiPubPersonsSpec, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeCngDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeVosoolDate, 
-                         dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeBargashtDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeCancelDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeToPerDate, 
-                         dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeToBankDate, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeHoghughiDate, dbo.Tss_RapReceivedCheque.SiPubSubLocations, 
-                         dbo.Tss_RapReceivedCheque.SiRapCashDefine, dbo.Tss_RapReceivedCheque.SiPubCustomCodes, Tss_PubPersonsViw_2.Cod_PubPersonCode, Tss_PubPersonsViw_2.Des_FullName, 
-                         Tss_PubPersonsViw_2.Cod_PubPersonCode, Tss_PubPersonsViw_2.Des_FullName, dbo.Tss_RapRecChequeToBankVw.Sta_CheckToBankState, dbo.Tss_RapReceivedCheque.Dat_EsterdadToPer, 
-                         dbo.Tss_RapReceivedCheque.Dat_EsterdadToCashier, dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeToAgainDate, dbo.Tss_RapReceivedCheque.SiRapRecievedChequeRef_RefrenceHd, 
-                         dbo.Tss_RapReceivedCheque.SiRapBehalfDefineHd, dbo.Tss_RapReceivedCheque.Sta_CalcInReturnRep, dbo.Tss_RapReceivedCheque.Sta_RapReceivedChequeState, 
-                         dbo.Tss_RapReceivedCheque.Dat_RapReceivedChequeRegDate, Tss_PubPersonsViw_4.Cod_PubPersonCode, Tss_PubPersonsViw_4.Des_FullName, 
-                         Tss_PubPersonsViw_2.SiPerRelatedSaler, dbo.Tss_RapReceivedCheque.Des_ReceivedChequeSayadiCode,
-                         dbo.Tss_RapReceivedCheque.Des_ReceivedChequeSayadiNationalCode, dbo.Tss_RapReceivedCheque.Sta_IsChecqueElectronic, dbo.Tss_RapReceivedCheque.Des_RecCheqOurSayadiNationalCode
+alter PROCEDURE Tss_AccUntDailyDafDetailedPreRepVStp
+(  
+	@InternalWhere VarChar(8000)='',
+	@Where VarChar(8000)='',
+	@Order VarChar(8000)='',
+	@DsStart VarChar(10)='1402/01/01',
+	@DsEnd VarChar(10)='1402/01/05',
+	@SiAccCodeBook VarChar(8000)='',
+	@Desc varchar(500)='',
+	@TafDesc varchar(500)='',
+	@MoeinCode varchar(500)='',
+	@MoeinDesc varchar(500)='',
+	@BedAmountFilter varchar(500)='',
+	@BesAmountFilter varchar(500)='',
+	@StaFtet SmallInt=1,
+	@StaEkhtem SmallInt=0,
+	@StavClose SmallInt=0,
+	@SiFinProd Numeric=14,
+	@SiSubLoc varchar(500)='1,2,3,4,5,6,7,8,9,10',
+	@SiUser Numeric=1
 
+) 
+
+AS
+
+Set XACT_ABORT ON
+
+If @InternalWhere<>''
+   Set @InternalWhere=' Where '+@InternalWhere
+If @Where<>''
+   Set @Where=' Where '+@Where
+If @Order<>''
+   Set @Order=' Order By '+@Order
+Else
+   Set @Order=' Order By KolCode,MoeinCode'+@Order
+
+SELECT 
+	SiAccFinancePeriodToPlace
+Into #TempTable
+FROM         
+	dbo.Tss_AccFinancePeriodToPlace
+Where
+--	(SiAccFinancePeriod=@SiFinProd) And
+	(SiPubSubLocations in (select * from dbo.Tss_StdStringSiFindUdf(@SiSubLoc)))
+
+Declare
+   @SqlTxt VarChar(8000),
+   @WhSi VarChar(200)
+
+Set @SqlTxt=
+	'Select 
+		SiAccCodeBook, 
+		SiPubPersonsSpec1, 
+		SiPubCostCenter1, 
+		Num_VhedFinalNo,
+		Num_VhedSubNo,
+		Sta_VdetDebtOrCredit, 
+		Dat_AccVoucherDetDate,
+		SiAccVoucher_Dt, 
+		SiAccVoucher_Hd, 
+		Des_VdetDesc, 
+		Num_VdetDebtAmount, 
+		Num_VdetCreditAmount, 
+		Dat_VhedDate, 
+		Cod_AccountCodeTot, 
+		GroupCode, 
+		KolCode, 
+		MoeinCode, 
+		Cod_PubPersonCode, 
+		Cod_CostCenterCode, 
+		Cod_AccFinancePeriod, 
+		Des_AccFinancePeriod, 
+		Cod_SubLocCode, 
+		Des_SubLocName, 
+		Num_VdetAmount, 
+		Num_VDetRow, 
+		Des_CostCenterName, 
+		Cod_VoucherType, 
+		Des_VoucherType, 
+		Des_AccountDesc, 
+		Des_AccountFullDesc, 
+		Des_FullName,
+		Cod1,
+		Cod2,
+		Cod3,
+		SiRelatedSenderSerial,
+		Case
+			When  Num_VdetDebtAmount>Num_VdetCreditAmount then Num_VdetDebtAmount-Num_VdetCreditAmount
+			When  Num_VdetDebtAmount<Num_VdetCreditAmount then 0
+		End sRestBed,
+		Case
+			When  Num_VdetDebtAmount>Num_VdetCreditAmount then 0
+			When  Num_VdetDebtAmount<Num_VdetCreditAmount then Num_VdetCreditAmount-Num_VdetDebtAmount
+		End sRestBes,
+		case 
+			when isnull(Cod_PubPersonCode,'''')<>'''' then Cod_PubPersonCode 
+			when isnull(Cod_CostCenterCode,'''')<>'''' then Cod_CostCenterCode 
+		end as CodTaf,
+		case 
+			when isnull(Des_SubLocName,'''')<>'''' then Des_SubLocName 
+			when isnull(Des_CostCenterName,'''')<>'''' then Des_CostCenterName 
+		end as DesTaf
+	From 
+	   (
+	   Select * From 
+	(
+	SELECT TOP 100 PERCENT 
+		(SELECT Des_AccountDesc FROM Tss_AccCodeBook WHERE (Cod_AccountCode IN (SELECT LEFT(Cod_AccountCode, 2) FROM Tss_AccCodeBook WHERE (SiAccCodeBook = Tss_AccVoucher_Dt.SiAccCodeBook)))) Cod1,
+		(SELECT Des_AccountDesc FROM Tss_AccCodeBook WHERE (Cod_AccountCode IN (SELECT LEFT(Cod_AccountCode, 4) FROM Tss_AccCodeBook WHERE (SiAccCodeBook = Tss_AccVoucher_Dt.SiAccCodeBook)))) Cod2,
+		(SELECT Des_AccountDesc FROM Tss_AccCodeBook WHERE (Cod_AccountCode IN (SELECT LEFT(Cod_AccountCode, 6) FROM Tss_AccCodeBook WHERE (SiAccCodeBook = Tss_AccVoucher_Dt.SiAccCodeBook)))) Cod3,
+		Tss_AccVoucher_Dt.SiAccVoucher_Dt, 
+		Tss_AccVoucher_Dt.SiAccVoucher_Hd, 
+		Tss_AccVoucher_Dt.Des_VdetDesc, 
+		Tss_AccVoucher_Dt.Num_VdetDebtAmount, 
+		Tss_AccVoucher_Dt.Num_VdetCreditAmount, 
+		Tss_AccVoucher_Hd.Dat_VhedDate, 
+		Tss_AccVoucher_Hd.Num_VhedFinalNo,
+		Tss_AccVoucher_Hd.Num_VhedSubNo,
+		Tss_AccCodeBook.Cod_AccountCode as Cod_AccountCodeTot, 
+		SUBSTRING(Tss_AccCodeBook.Cod_AccountCode, 1, 2) AS GroupCode, 
+		SUBSTRING(Tss_AccCodeBook.Cod_AccountCode, 1, 2) + SUBSTRING(Tss_AccCodeBook.Cod_AccountCode, 3, 2) AS KolCode, 
+		SUBSTRING(Tss_AccCodeBook.Cod_AccountCode, 1, 2) + SUBSTRING(Tss_AccCodeBook.Cod_AccountCode, 3, 2) + SUBSTRING(Tss_AccCodeBook.Cod_AccountCode, 5, 2) AS MoeinCode, 
+		Tss_PubPersonsViw.Cod_PubPersonCode, 
+		Tss_PubCostCenter.Cod_CostCenterCode, 
+		Tss_AccFinancePeriod.Cod_AccFinancePeriod, 
+		Tss_AccFinancePeriod.Des_AccFinancePeriod, 
+		Tss_PubSubLocations.Cod_SubLocCode, 
+		Tss_PubSubLocations.Des_SubLocName, 
+		Tss_AccVoucher_Dt.Num_VdetAmount, 
+		Tss_AccVoucher_Dt.Num_VDetRow, 
+		Tss_PubCostCenter.Des_CostCenterName, 
+		Tss_AccVoucherType.Cod_VoucherType, 
+		Tss_AccVoucherType.Des_VoucherType, 
+		Tss_AccCodeBook.Des_AccountDesc, 
+		Tss_AccCodeBook.Des_AccountFullDesc, 
+		Tss_PubPersonsViw.Des_FullName, 
+
+		Tss_AccVoucher_Dt.SiAccCodeBook, 
+		Tss_AccVoucher_Dt.SiPubPersonsSpec1, 
+		Tss_AccVoucher_Dt.SiPubCostCenter1, 
+		Tss_AccVoucher_Dt.Sta_VdetDebtOrCredit, 
+		Tss_AccVoucher_Dt.Dat_AccVoucherDetDate,
+		Tss_AccVoucher_Dt.SiRelatedSenderSerial
+	FROM         
+		Tss_AccVoucher_Dt INNER JOIN
+		Tss_AccVoucher_Hd ON Tss_AccVoucher_Dt.SiAccVoucher_Hd = Tss_AccVoucher_Hd.SiAccVoucher_Hd INNER JOIN
+		Tss_AccCodeBook ON Tss_AccVoucher_Dt.SiAccCodeBook = Tss_AccCodeBook.SiAccCodeBook INNER JOIN
+		Tss_AccFinancePeriodToPlace ON 
+		Tss_AccVoucher_Hd.SiAccFinancePeriodToPlace = Tss_AccFinancePeriodToPlace.SiAccFinancePeriodToPlace INNER JOIN
+		Tss_AccFinancePeriod ON Tss_AccFinancePeriodToPlace.SiAccFinancePeriod = Tss_AccFinancePeriod.SiAccFinancePeriod INNER JOIN
+		Tss_PubSubLocations ON Tss_AccFinancePeriodToPlace.SiPubSubLocations = Tss_PubSubLocations.SiPubSubLocations INNER JOIN
+		Tss_AccVoucherType ON Tss_AccVoucher_Hd.SiAccVoucherType = Tss_AccVoucherType.SiAccVoucherType LEFT OUTER JOIN
+		Tss_PubCostCenter ON Tss_AccVoucher_Dt.SiPubCostCenter1 = Tss_PubCostCenter.SiPubCostCenter LEFT OUTER JOIN
+		Tss_PubPersonsViw ON Tss_AccVoucher_Dt.SiPubPersonsSpec1 = Tss_PubPersonsViw.SiPubPersonsSpec		
+	WHERE     
+		(dbo.Tss_AccVoucher_Hd.Dat_VhedDate BETWEEN ' +''''+@DsStart+''''+  ' AND ' +''''+@DsEnd+''''+ ') And
+		(dbo.Tss_AccVoucher_Hd.SiAccFinancePeriodToPlace in (select * from #TempTable))'
+
+	 if Isnull(@Desc ,'')<>''
+		Set @SqlTxt = @SqlTxt + ' and (Des_VdetDesc like '+''''+'%'+@Desc+'%'+''''+')'
+
+	 if Isnull(@TafDesc ,'')<>''
+		Set @SqlTxt = @SqlTxt + ' and (Des_FullName like '+''''+'%'+@TafDesc+'%'+''''+')'
+
+	 if Isnull(@MoeinCode ,'')<>''
+		Set @SqlTxt = @SqlTxt + ' and (SUBSTRING(Tss_AccCodeBook.Cod_AccountCode, 1, 2) + SUBSTRING(Tss_AccCodeBook.Cod_AccountCode, 3, 2) + SUBSTRING(Tss_AccCodeBook.Cod_AccountCode, 5, 2) like '+''''+'%'+@MoeinCode+'%'+''''+')'
+
+	 if Isnull(@MoeinDesc ,'')<>''
+		Set @SqlTxt = @SqlTxt + ' and (Des_AccountFullDesc like '+''''+'%'+@MoeinDesc+'%'+''''+')'
+
+	 if Isnull(@BedAmountFilter,'')<>''
+		Set @SqlTxt = @SqlTxt + ' and (Num_VdetDebtAmount like '+''''+'%'+@BedAmountFilter+'%'+''''+')'
+
+	 if Isnull(@BesAmountFilter ,'')<>''
+		Set @SqlTxt = @SqlTxt + ' and (Num_VdetCreditAmount like '+''''+'%'+@BesAmountFilter+'%'+''''+')'
+
+	Set @WhSi=''
+		If @StaFtet=0
+			SELECT @WhSi=convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 0)
+		If @StaEkhtem=0
+			If @WhSi=''
+				SELECT @WhSi=convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 1)
+			Else
+				SELECT @WhSi=@WhSi+','+convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 1)
+		If @StavClose=0
+			If @WhSi=''
+				SELECT @WhSi=convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup =3)
+			Else
+				SELECT @WhSi=@WhSi+','+convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 3)
+
+		If @WhSi<>''
+		Begin
+			Set @WhSi=' And (Not (dbo.Tss_AccVoucher_Hd.SiAccVoucherType in ('+@WhSi+')))'
+			Set @SqlTxt=@SqlTxt+Char(10)+@WhSi
+		End
+
+		-- Hide hidden voucher lines from users who are not in the AccStar group
+		If dbo.Tss_StdFindIfUserIsInGroup(@SiUser,'AccStar') <> 1
+			Set @SqlTxt=@SqlTxt+' And (Tss_AccVoucher_Dt.Sta_IsHidden = 0 OR Tss_AccVoucher_Dt.Sta_IsHidden IS NULL)'
+		
+		Set @SqlTxt = @SqlTxt + ') Ccc '
+
+
+	 if Isnull(@SiAccCodeBook ,0)>0
+		Set @SqlTxt = @SqlTxt + 'Where (SiAccCodeBook = '+convert(varchar,@SiAccCodeBook)+')'
+
+
+print @SqlTxt
+Exec(@SqlTxt+' '+@InternalWhere+') CalcSel ' + @Where + @Order)
 
 GO
 
-alter proc Tss_RapFrmRecievedChequeRepRStpAll
-(
-    @SiPubSubLocations numeric=0,
-    @SiRapCashDefine numeric=0,
-    @SiPubPersonsSpec numeric=0,
-    @GhabzNo varchar(50)='',
-    @RegDate varchar(10)='1404/01/01',
-    @RegDate2 varchar(10)='1404/12/29',
-    @UsanceDate varchar(10)='',
-    @UsanceDate2 varchar(10)='',
-    @Dat_RapReceivedChequeVosoolDate varchar(10)='',
-    @Dat_RapReceivedChequeVosoolDate2 varchar(10)='',
-    @Dat_RapReceivedChequeBargashtDate varchar(10)='',
-    @Dat_RapReceivedChequeBargashtDate2 varchar(10)='',
-    @Dat_RapReceivedChequeToPerDate varchar(10)='',
-    @Dat_RapReceivedChequeToPerDate2 varchar(10)='',
-    @Dat_RapReceivedChequeToBankDate varchar(10)='',
-    @Dat_RapReceivedChequeToBankDate2 varchar(10)='',
-    @Dat_RapReceivedChequeHoghughiDate varchar(10)='',
-    @Dat_RapReceivedChequeHoghughiDate2 varchar(10)='',
-    @Dat_RapReceivedChequeCancelDate varchar(10)='',
-    @Dat_RapReceivedChequeCancelDate2 varchar(10)='',
-    @Dat_EsterdadToPer varchar(10)='',
-    @Dat_EsterdadToPer2 varchar(10)='',
-    @Dat_EsterdadToCashier varchar(10)='',
-    @Dat_EsterdadToCashier2 varchar(10)='',
-    @Dat_RapReceivedChequeToAgainDate varchar(10)='',
-    @Dat_RapReceivedChequeToAgainDate2 varchar(10)='',
-    @Sta_ChekRecieptMainOrNot SmallInt=0,
-    @Sta_RapReceivedChequeState varchar(500)='1',
-    @SiCheks varchar(8000)='',
-    @StaDateFilter SmallInt=0,
-    @SiUser numeric=1,
-    @SiToPer varchar(1000)='',
-    @SiRelatedPer varchar(1000)='',
-    @SayadiRegistered char(1)='0',
-    @NotSayadiRegistered char(1)='0',
-    @IsElectronic char(1)='0',
-	@StaSumPers smallint=0
-)
-as
+alter PROCEDURE Tss_AccUntAccountReviewTafsilRStp
+(  
+   @InternalWhere VarChar(8000)='',
+   @Where VarChar(8000)='',
+   @Order VarChar(8000)='',
+   @DsFromDate VarChar(10)='1390/01/01',
+   @DsToDate VarChar(10)='1397/12/29',
+   @SiAccFinancePeriod Numeric=9,
+   @SiPubSubLocations varchar(500)='1,2',
+   @Sta_Start SmallInt=0,
+   @Sta_End SmallInt=0,
+   @Sta_Close SmallInt=0,
+   @FlgLevel SmallInt=4,
+   @Cod_AccountCode VarChar(50)='611012',
+   @StaBaMandeh smallint=0,
+   @SiUser Numeric=1
+) 
 
-declare    
-    @SayadiSql varchar(1000)
+AS
 
-    if @SayadiRegistered='1' and @NotSayadiRegistered = '0'
-        Set @SayadiSql = 'AND (isnull(cheks1.Des_ReceivedChequeSayadiNationalCode,''0'')>''0'')'
+Set arithabort ON
+Set concat_null_yields_null ON
+Set ansi_nulls ON
+Set ansi_null_dflt_on ON
+Set ansi_padding ON
+Set ansi_warnings ON
+Set quoted_identifier ON
 
-    if @SayadiRegistered='0' and @NotSayadiRegistered = '1'
-        Set @SayadiSql = 'AND (isnull(cheks1.Des_ReceivedChequeSayadiNationalCode,''0'')=''0'')'
+If @InternalWhere<>''
+   Set @InternalWhere=' Where '+@InternalWhere
+If @Where<>''
+   Set @Where=' Where '+@Where
 
-    if @SayadiRegistered='1' and @NotSayadiRegistered = '1'
-        Set @SayadiSql = ''
+-- Fixed ORDER BY to avoid conversion errors
+If @Order<>''
+   Set @Order=' Order By '+@Order
+else
+   Set @Order=' Order By CASE WHEN ISNUMERIC(TafCode)=1 THEN convert(numeric, TafCode) ELSE 999999 END'
 
-    if @SayadiRegistered='0' and @NotSayadiRegistered = '0'
-        Set @SayadiSql = ''
+Declare
+   @WhType VarChar(20),
+   @SqlTxt VarCHar(8000),
+   @Sta_TafType1 SmallInt,
+   @SiAccCodeBook Numeric,
+	@AccAllDocs smallint
 
-    if @IsElectronic='1' 
-        Set @SayadiSql = 'AND (isnull(cheks1.Sta_IsChecqueElectronic,''0'')=''1'')'
+select @AccAllDocs = dbo.Tss_StdFindSystemParamValue('AccAllDocs')
 
-if @GhabzNo=''
+-- Hide hidden voucher lines from users who are not in the AccStar group
+Declare @HiddenFilter VarChar(200)
+If dbo.Tss_StdFindIfUserIsInGroup(@SiUser,'AccStar') = 1
+   Set @HiddenFilter = ''
+Else
+   Set @HiddenFilter = ' AND (vDet.Sta_IsHidden = 0 OR vDet.Sta_IsHidden IS NULL) '
+
+SELECT 
+	SiAccFinancePeriodToPlace
+Into #TempTable
+FROM         
+	dbo.Tss_AccFinancePeriodToPlace
+Where
+	(SiPubSubLocations in (select * from dbo.Tss_StdStringSiFindUdf(@SiPubSubLocations)))
+
+SELECT     
+   @Sta_TafType1=Sta_TafType1, 
+   @SiAccCodeBook=SiAccCodeBook
+FROM
+   dbo.Tss_AccCodeBook cBook
+WHERE
+   (Cod_AccountCode = @Cod_AccountCode)
+
+Set @WhType=''
+If @Sta_Start=0
+   SELECT @WhType=convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 0)
+If @Sta_End=0
+   If @WhType=''
+      SELECT @WhType=convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 1)
+   Else
+      SELECT @WhType=@WhType+','+convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 1)
+If @Sta_Close=0
+   If @WhType=''
+      SELECT @WhType=convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup =3)
+   Else
+      SELECT @WhType=@WhType+','+convert(varchar,SiAccVoucherType) FROM Tss_AccVoucherType WHERE (Sta_VoucherTypeGroup = 3)
+
+If @Sta_TafType1=1
 Begin
-	Declare
-		@SqlText varchar(8000),
-		@Whr varchar(8000)
-	
-	-- Check if aggregation is needed
-	IF @StaSumPers = 1
-	BEGIN
-		Set @SqlText =
-		'SELECT 
-			CAST(NULL AS varchar(50)) AS GhabzNo,
-			CAST(NULL AS varchar(200)) AS BankName,
-			cheks1.GiverCode,
-			cheks1.GiverName,
-			CAST(NULL AS varchar(1)) AS RecieverCode,
-			CAST(NULL AS varchar(1)) AS RecieverName,
-			CAST(NULL AS varchar(10)) AS RegDate,
-			CAST(NULL AS varchar(10)) AS UsanceDate,
-			SUM(cheks1.ChequeAmount) AS ChequeAmount,
-			CAST(NULL AS varchar(50)) AS BankBranchCode,
-			CAST(NULL AS varchar(50)) AS ChequeSerial,
-			CAST(NULL AS varchar(500)) AS Tozihat,
-			CAST(NULL AS varchar(1500)) AS RecieptTozih,
-			CAST(NULL AS smallint) AS Sta_ChekRecieptMainOrNot,
-			CAST(NULL AS numeric(18,0)) AS SiRapReceivedCheque,
-			CAST(NULL AS varchar(50)) AS ContractNo,
-			CAST(NULL AS numeric(18,0)) AS SiPubPersonsSpec,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeCngDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeVosoolDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeBargashtDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeCancelDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToPerDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToBankDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeHoghughiDate,
-			CAST(NULL AS numeric(18,0)) AS SiPubSubLocations,
-			CAST(NULL AS smallint) AS Sta_RapReceivedChequeState,
-			CAST(NULL AS numeric(18,0)) AS SiRapCashDefine,
-			CAST(NULL AS numeric(18,0)) AS SiPubCustomCodes,
-			CAST(NULL AS varchar(50)) AS Cod_PubPersonCode,
-			CAST(NULL AS varchar(401)) AS Des_FullName,
-			CAST(NULL AS varchar(50)) AS GirandehCode,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToAgainDate,
-			CAST(NULL AS varchar(50)) AS Dat_EsterdadToPer,
-			CAST(NULL AS varchar(50)) AS Dat_EsterdadToCashier,
-			CAST(NULL AS varchar(401)) AS GirandehDesc,
-			CAST(NULL AS varchar(50)) AS Des_ReceivedChequeSayadiCode,
-			CAST(NULL AS varchar(50)) AS Des_ReceivedChequeSayadiNationalCode,
-			CAST(NULL AS varchar(50)) AS Des_RecCheqOurSayadiNationalCode,
-			CAST(NULL AS smallint) AS Sta_IsChecqueElectronic
-		FROM         
-			Tss_RapRecCheckGhabzRep1Vw cheks1 LEFT OUTER JOIN
-			Tss_RapRecCheckGhabzRep2Vw cheks2 ON cheks1.SiRapReceivedCheque = cheks2.SiRapReceivedCheque
-		'
-	END
-	ELSE
-	BEGIN
-		Set @SqlText =
-		'select * from (SELECT   distinct  
-			cheks1.GhabzNo, 
-			cheks1.BankName, 
-			cheks1.GiverCode, 
-			cheks1.GiverName, 
-			'''' RecieverCode, 
-			'''' RecieverName, 
-			cheks1.RegDate, 
-			cheks1.UsanceDate, 
-			cheks1.ChequeAmount, 
-			cheks1.BankBranchCode, 
-			cheks1.ChequeSerial, 
-			cheks1.Tozihat, 
-			cheks1.RecieptTozih, 
-			cheks1.Sta_ChekRecieptMainOrNot, 
-			cheks1.SiRapReceivedCheque, 
-			cheks2.Cod_SaleAgreement AS ContractNo, 
-			cheks1.SiPubPersonsSpec, 
-			cheks1.Dat_RapReceivedChequeCngDate, 
-			cheks1.Dat_RapReceivedChequeVosoolDate, 
-			cheks1.Dat_RapReceivedChequeBargashtDate, 
-			cheks1.Dat_RapReceivedChequeCancelDate, 
-			cheks1.Dat_RapReceivedChequeToPerDate, 
-			cheks1.Dat_RapReceivedChequeToBankDate, 
-			cheks1.Dat_RapReceivedChequeHoghughiDate,
-			cheks1.SiPubSubLocations, 
-			cheks1.Sta_RapReceivedChequeState, 
-			cheks1.SiRapCashDefine, 
-			cheks1.SiPubCustomCodes, 
-			cheks1.Cod_PubPersonCode, 
-			cheks1.Des_FullName, 
-			cheks1.GirandehCode, 
-			cheks1.Dat_RapReceivedChequeToAgainDate, 
-			cheks1.Dat_EsterdadToPer, 
-			cheks1.Dat_EsterdadToCashier, 
-			cheks1.GirandehDesc,
-			cheks1.Des_ReceivedChequeSayadiCode,
-			cheks1.Des_ReceivedChequeSayadiNationalCode,
-			cheks1.Des_RecCheqOurSayadiNationalCode,
-			cheks1.Sta_IsChecqueElectronic
-		FROM         
-			Tss_RapRecCheckGhabzRep1Vw cheks1 LEFT OUTER JOIN
-			Tss_RapRecCheckGhabzRep2Vw cheks2 ON cheks1.SiRapReceivedCheque = cheks2.SiRapReceivedCheque
-		'
-	END
-
-	Set @Whr = ''
-
-	if isnull(@SiPubSubLocations,0)<>0	
-	Begin
-		Set @Whr = ' WHERE     
-				     (cheks1.SiPubSubLocations = '+convert(varchar,@SiPubSubLocations)+') '
-		if isnull(@SiPubPersonsSpec,0)<>0 
-		Set @Whr = @Whr + ' AND  (cheks1.SiPubPersonsSpec = '+convert(varchar,@SiPubPersonsSpec)+') '
-	End	 
-	Else
-	Begin
-		if isnull(@SiPubPersonsSpec,0)<>0 
-			Set @Whr = @Whr + ' Where  (cheks1.SiPubPersonsSpec = '+convert(varchar,@SiPubPersonsSpec)+') '
-		Else
-			Set @Whr = @Whr + ' Where '
-	End
-
-	if @SiToPer<>''
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-		Set @Whr = @Whr + ' AND (cheks1.SiRapReceivedCheque in (SELECT SiRapReceivedCheque FROM Tss_RapRecChequeToBank WHERE (SiPubPersonsSpec IN (SELECT Sisel FROM dbo.Tss_StdStringSiFindUdf('+''''+@SiToPer+''''+')))))'
-	Else
-		Set @Whr = @Whr + ' (cheks1.SiRapReceivedCheque in (SELECT SiRapReceivedCheque FROM Tss_RapRecChequeToBank WHERE (SiPubPersonsSpec IN (SELECT Sisel FROM dbo.Tss_StdStringSiFindUdf('+''''+@SiToPer+''''+')))))'
-	End
-
-	if @SiRelatedPer<>''
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-		Set @Whr = @Whr + ' AND (cheks1.SiPerRelatedSaler in  (SELECT Sisel FROM dbo.Tss_StdStringSiFindUdf('+''''+@SiRelatedPer+''''+')))'
-	Else
-		Set @Whr = @Whr + ' (cheks1.SiPerRelatedSaler in  (SELECT Sisel FROM dbo.Tss_StdStringSiFindUdf('+''''+@SiRelatedPer+''''+')))'
-	End
-
-	if (@Sta_RapReceivedChequeState<>'') and (@Sta_RapReceivedChequeState<>'1')
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-		Set @Whr = @Whr + ' AND (cheks1.Sta_RapReceivedChequeState in (Select Sisel from dbo.Tss_StdStringSiFindUdf('+''''+@Sta_RapReceivedChequeState+''''+')))'
-	Else
-		Set @Whr = @Whr + '  (cheks1.Sta_RapReceivedChequeState in (Select Sisel from dbo.Tss_StdStringSiFindUdf('+''''+@Sta_RapReceivedChequeState+''''+')))'
-	End
+   Set @SqlTxt=
+   '
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,
+      Acc_Bed,
+      Acc_Bes,
+		Des_VdetDesc, 
+		Dat_AccVoucherDetDate, 
+		Num_VdetAmount,
+      Case When Acc_Bed>Acc_Bes Then Acc_Bed-Acc_Bes Else 0 End As Rst_Bed,
+      Case When Acc_Bes>Acc_Bed Then Acc_Bes-Acc_Bed Else 0 End As Rst_Bes,
+		dbo.Tss_FindRelatedSaler(TafCode) as RelatedSaler,
+		Des_CodeDescription
+   From
+   (
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,
+      Sum(Num_VdetDebtAmount) Acc_Bed,
+      Sum(Num_VdetCreditAmount) Acc_Bes,
+		Des_VdetDesc, 
+		Dat_AccVoucherDetDate, 
+		Num_VdetAmount,
+		Des_CodeDescription
+   From
+   (
+      SELECT     
+         dbo.Tss_PubPersonsViw.Cod_PubPersonCode TafCode, 
+         dbo.Tss_PubPersonsViw.Des_FullName TafDesc,
+         dbo.Tss_PubPersonsViw.SiPubPersonsSpec as SiTaf,
+         vDet.Num_VdetDebtAmount, 
+         vDet.Num_VdetCreditAmount,
+			'''' Des_VdetDesc,
+			'''' Dat_AccVoucherDetDate,
+			$0.0 Num_VdetAmount,
+			dbo.Tss_PubPersonsViw.Des_CodeDescription
+      FROM         
+         dbo.Tss_AccVoucher_Dt vDet INNER JOIN dbo.Tss_AccVoucher_Hd vHed 
+         ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd INNER JOIN
+         dbo.Tss_PubPersonsViw ON vDet.SiPubPersonsSpec1 = dbo.Tss_PubPersonsViw.SiPubPersonsSpec
+      WHERE '
+	if @AccAllDocs=0
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3)  AND (vHed.Sta_VochStatus <> 5)  AND 
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+         (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
 	else
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3)  AND --(vHed.Sta_VochStatus <> 5)  AND 
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+         (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
 
-IF (@Sta_RapReceivedChequeState = '1')
+   Set @SqlTxt=@SqlTxt+@HiddenFilter
+
+   If @WhType<>''
+      Set @SqlTxt=@SqlTxt+' AND (vHed.SiAccVoucherType Not In ('+@WhType+'))'
+   Set @SqlTxt=@SqlTxt+' ) Ddd '
+   Set @SqlTxt=@SqlTxt+' Group By TafCode, TafDesc, SiTaf, Des_VdetDesc, Dat_AccVoucherDetDate, Num_VdetAmount, Des_CodeDescription ) Dd2 '
+End
+
+
+If @Sta_TafType1=2
+Begin
+   Set @SqlTxt=
+   '
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,
+      Acc_Bed,
+      Acc_Bes,
+		Des_VdetDesc, 
+		Dat_AccVoucherDetDate, 
+		Num_VdetAmount,
+      Case When Acc_Bed>Acc_Bes Then Acc_Bed-Acc_Bes Else 0 End As Rst_Bed,
+      Case When Acc_Bes>Acc_Bed Then Acc_Bes-Acc_Bed Else 0 End As Rst_Bes,
+		dbo.Tss_FindRelatedSaler(TafCode) as RelatedSaler,
+		Des_CodeDescription
+   From
+   (
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,
+      Sum(Num_VdetDebtAmount) Acc_Bed,
+      Sum(Num_VdetCreditAmount) Acc_Bes,
+		Des_VdetDesc, 
+		Dat_AccVoucherDetDate, 
+		Num_VdetAmount,
+		Des_CodeDescription
+   From
+   (
+      SELECT     
+         dbo.Tss_PubCostCenter.Cod_CostCenterCode TafCode,  
+         dbo.Tss_PubCostCenter.Des_CostCenterName TafDesc,
+         dbo.Tss_PubCostCenter.SiPubCostCenter as SiTaf,
+         vDet.Num_VdetDebtAmount, 
+         vDet.Num_VdetCreditAmount,
+			'''' Des_VdetDesc,
+			'''' Dat_AccVoucherDetDate,
+			$0.0 Num_VdetAmount,
+			dbo.Tss_PubCostCenter.Des_CodeDescription
+      FROM   
+         dbo.Tss_AccVoucher_Dt vDet INNER JOIN dbo.Tss_AccVoucher_Hd vHed 
+         ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd INNER JOIN
+         dbo.Tss_PubCostCenter ON vDet.SiPubCostCenter1 = dbo.Tss_PubCostCenter.SiPubCostCenter
+      WHERE '
+	if @AccAllDocs=0
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3)  AND (vHed.Sta_VochStatus <> 5)  AND  
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+	      (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
+	else
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3)  AND --(vHed.Sta_VochStatus <> 5)  AND  
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+	      (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
+
+   Set @SqlTxt=@SqlTxt+@HiddenFilter
+
+If @WhType<>''
+      Set @SqlTxt=@SqlTxt+' AND (vHed.SiAccVoucherType Not In ('+@WhType+'))'
+   Set @SqlTxt=@SqlTxt+' ) Ddd
+   Group By TafCode, TafDesc, SiTaf, Des_VdetDesc, Dat_AccVoucherDetDate, Num_VdetAmount, Des_CodeDescription ) Dd2'
+End
+
+If @Sta_TafType1=3
+Begin
+   Set @SqlTxt=
+   '
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,
+      Acc_Bed,
+      Acc_Bes,
+      Case When Acc_Bed>Acc_Bes Then Acc_Bed-Acc_Bes Else 0 End As Rst_Bed,
+      Case When Acc_Bes>Acc_Bed Then Acc_Bes-Acc_Bed Else 0 End As Rst_Bes,
+		dbo.Tss_FindRelatedSaler(TafCode) as RelatedSaler,
+		'''' as Des_CodeDescription
+   From
+   (
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,
+      Sum(Num_VdetDebtAmount) Acc_Bed,
+      Sum(Num_VdetCreditAmount) Acc_Bes
+   From
+   (
+      SELECT     
+         dbo.Tss_PubProjects.Cod_ProjectsCode TafCode,  
+         dbo.Tss_PubProjects.Des_ProjectsThemeDesc TafDesc,
+         dbo.Tss_PubProjects.SiPubProjects as SiTaf,
+         vDet.Num_VdetDebtAmount, 
+         vDet.Num_VdetCreditAmount 
+      FROM         
+         dbo.Tss_AccVoucher_Dt vDet INNER JOIN dbo.Tss_AccVoucher_Hd vHed 
+         ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd INNER JOIN
+         dbo.Tss_PubProjects ON vDet.SiPubProjects1 = dbo.Tss_PubProjects.SiPubProjects
+      WHERE '
+	if @AccAllDocs=0
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3) AND (vHed.Sta_VochStatus <> 5)  AND  
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+         (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
+	else
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3) AND --(vHed.Sta_VochStatus <> 5)  AND  
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+         (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
+
+   Set @SqlTxt=@SqlTxt+@HiddenFilter
+
+   If @WhType<>''
+      Set @SqlTxt=@SqlTxt+' AND (vHed.SiAccVoucherType Not In ('+@WhType+'))'
+   Set @SqlTxt=@SqlTxt+' ) Ddd
+   Group By TafCode, TafDesc, SiTaf ) Dd2'
+End
+
+If @Sta_TafType1=4
+Begin
+   Set @SqlTxt=
+   '
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,
+      Acc_Bed,
+      Acc_Bes,
+      Case When Acc_Bed>Acc_Bes Then Acc_Bed-Acc_Bes Else 0 End As Rst_Bed,
+      Case When Acc_Bes>Acc_Bed Then Acc_Bes-Acc_Bed Else 0 End As Rst_Bes,
+		dbo.Tss_FindRelatedSaler(TafCode) as RelatedSaler,
+		'''' Des_CodeDescription
+   From
+   (
+   Select 
+      TafCode,
+      TafDesc,
+      SiTaf,
+      Sum(Num_VdetDebtAmount) Acc_Bed,
+      Sum(Num_VdetCreditAmount) Acc_Bes
+   From
+   (
+      SELECT     
+         dbo.Tss_PurOrder_Hd.Cod_PurOrderCode TafCode,  
+         dbo.Tss_PurOrder_Hd.Des_PurOrderDesc TafDesc,
+         dbo.Tss_PurOrder_Hd.SiPurOrder_Hd as SiTaf,
+         vDet.Num_VdetDebtAmount, 
+         vDet.Num_VdetCreditAmount 
+      FROM         
+         dbo.Tss_AccVoucher_Dt vDet INNER JOIN dbo.Tss_AccVoucher_Hd vHed 
+         ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd INNER JOIN
+         dbo.Tss_PurOrder_Hd ON vDet.SiPurOrder_Hd1 = dbo.Tss_PurOrder_Hd.SiPurOrder_Hd
+      WHERE '
+	if @AccAllDocs=0
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3)  AND (vHed.Sta_VochStatus <> 5)  AND  
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+         (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
+	else
+    Set @SqlTxt= @SqlTxt+
+         '(vHed.Sta_VochStatus >= 3)  AND --(vHed.Sta_VochStatus <> 5)  AND  
+			(vHed.SiAccFinancePeriodToPlace in (select * from #TempTable)) AND
+         (vHed.Dat_VhedDate Between '+''''+@DsFromDate+''''+' And '+''''+@DsToDate+''''+') AND
+         (vDet.SiAccCodeBook = '+Str(@SiAccCodeBook)+')'
+
+   Set @SqlTxt=@SqlTxt+@HiddenFilter
+
+   If @WhType<>''
+      Set @SqlTxt=@SqlTxt+' AND (vHed.SiAccVoucherType Not In ('+@WhType+'))'
+   Set @SqlTxt=@SqlTxt+' ) Ddd
+   Group By TafCode, TafDesc, SiTaf ) Dd2'
+End
+
+-- If @Sta_TafType1=0, return NULL for SiTaf
+If @Sta_TafType1=0
+Begin
+   Set @SqlTxt=
+   '
+   Select 
+      '''' TafCode,
+      '''' TafDesc,
+      NULL as SiTaf,
+      convert(numeric,0) Acc_Bed,
+      convert(numeric,0) Acc_Bes,
+      convert(numeric,0) Rst_Bed,
+      convert(numeric,0) Rst_Bes,
+      '''' Des_VdetDesc,
+      '''' Dat_AccVoucherDetDate,
+      convert(numeric,0) Num_VdetAmount,
+      '''' RelatedSaler,
+      '''' Des_CodeDescription
+   '
+End
+
+print @SqlTxt
+
+If @Sta_TafType1<>0
+Exec(
+'Select * From
+(
+   Select * From
+   ( '+@SqlTxt+
+   ' ) Ccc  '+@InternalWhere+'
+) CalcSel ' + @Where + @Order)
+Else
+Exec(@SqlTxt)
+
+GO
+
+alter   PROCEDURE Tss_AccUntTafsiliReview_03VStp
+(
+    @InternalWhere VARCHAR(8000)='',
+    @Where VARCHAR(8000)='',
+    @Order VARCHAR(8000)='',
+    @DsFromDate VARCHAR(10)='1399/01/01',
+    @DsToDate VARCHAR(10)='1399/09/07',
+    @SiAccFinancePeriod NUMERIC=20,
+    @SiPubSubLocations VARCHAR(500)='1,2',
+    @Sta_Start SMALLINT=0,
+    @Sta_End SMALLINT=0,
+    @Sta_Close SMALLINT=0,
+    @StaMandehOrNot SMALLINT=1,
+    @SiAccCodeBook VARCHAR(MAX)='',
+    @SiSelected VARCHAR(50)='',
+    @SiUser NUMERIC=1,
+    @AccCodePrefix VARCHAR(MAX)='',
+    @FlgTafType SMALLINT=-1,
+    @TafSelected VARCHAR(MAX)=''
+)
+AS
 BEGIN
-    DECLARE @Condition NVARCHAR(MAX)
+    SET NOCOUNT ON
+    SET XACT_ABORT, ARITHABORT, CONCAT_NULL_YIELDS_NULL, ANSI_NULLS,
+        ANSI_NULL_DFLT_ON, ANSI_PADDING, ANSI_WARNINGS, QUOTED_IDENTIFIER ON
 
-    SET @Condition = 
-        'cheks1.RegDate BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''' ' +
-        'AND (' +
-            '(ISNULL(cheks1.Dat_RapReceivedChequeToPerDate, '''') <> '''' AND ' +
-             'cheks1.Dat_RapReceivedChequeToPerDate NOT BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''') ' +
-            'OR ' +
-            '(ISNULL(cheks1.Dat_RapReceivedChequeToBankDate, '''') <> '''' AND ' +
-             'cheks1.Dat_RapReceivedChequeToBankDate NOT BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''') ' +
-            'OR ' +
-            '(ISNULL(cheks1.Dat_RapReceivedChequeBargashtDate, '''') BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''') ' +
-            'OR ' +
-            '(ISNULL(cheks1.Dat_RapReceivedChequeToAgainDate, '''') BETWEEN ''' + @RegDate + ''' AND ''' + @RegDate2 + ''')' +
-        ')'
+    DROP TABLE IF EXISTS #TmpVchTaf
+    DROP TABLE IF EXISTS #TmpVchTafMandeh
+    DROP TABLE IF EXISTS #TmpVchTafBaBiMandeh
+    DROP TABLE IF EXISTS #TempTable
+    DROP TABLE IF EXISTS #Pfx
+    DROP TABLE IF EXISTS #Taf
 
-    IF ISNULL(@Whr, '') <> ' Where '
-        SET @Whr = @Whr + ' AND ' + @Condition
+    SET @InternalWhere = CASE WHEN @InternalWhere IS NOT NULL AND @InternalWhere<>'' THEN ' WHERE '+@InternalWhere ELSE '' END
+    SET @Where         = CASE WHEN @Where         IS NOT NULL AND @Where        <>'' THEN ' WHERE '+@Where         ELSE '' END
+    SET @Order         = CASE WHEN @Order         IS NOT NULL AND @Order        <>'' THEN ' ORDER BY '+@Order    ELSE '' END
+
+    -- Build voucher-type exclusion list
+    DECLARE @WhType VARCHAR(300) =
+        CASE WHEN @Sta_Start=0
+             THEN (SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=0)
+             ELSE '' END
+
+    SET @WhType = ISNULL(@WhType,'')
+                + CASE WHEN @Sta_End=0 AND @WhType<>'' THEN ',' ELSE '' END
+                + CASE WHEN @Sta_End=0
+                       THEN ISNULL((SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=1),'')
+                       ELSE '' END
+
+    SET @WhType = @WhType
+                + CASE WHEN @Sta_Close=0 AND @WhType<>'' THEN ',' ELSE '' END
+                + CASE WHEN @Sta_Close=0
+                       THEN ISNULL((SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=3),'')
+                       ELSE '' END
+
+    SET @WhType = CASE WHEN @WhType<>'' THEN ' AND vHed.SiAccVoucherType NOT IN ('+@WhType+')' ELSE '' END
+
+    -- Determine which tafsil column to filter on
+    DECLARE @TafName VARCHAR(100) =
+        CASE @FlgTafType
+            WHEN 0 THEN 'SiPubPersonsSpec1'
+            WHEN 1 THEN 'SiPubCostCenter1'
+            WHEN 2 THEN 'SiPubProjects1'
+            ELSE
+                CASE (SELECT TOP 1 Sta_TafType1 FROM Tss_AccCodeBook
+                      WHERE SiAccCodeBook=(SELECT TOP 1 SiSel FROM dbo.Tss_StdStringSiFindUdf(@SiAccCodeBook)))
+                    WHEN 1 THEN 'SiPubPersonsSpec1'
+                    WHEN 2 THEN 'SiPubCostCenter1'
+                    WHEN 3 THEN 'SiPubProjects1'
+                    WHEN 4 THEN 'SiPurOrder_Hd1'
+                END
+        END
+
+    -- Account-code prefixes
+    SELECT LTRIM(RTRIM(value)) AS Pfx
+    INTO #Pfx
+    FROM dbo.Tss_StdStringSplitUdf(ISNULL(@AccCodePrefix,''), ',')
+    WHERE LTRIM(RTRIM(value))<>''
+
+    -- Tafsil selection pairs (type:si)
+    SELECT TRY_CAST(LEFT(v, CHARINDEX(':', v)-1) AS INT) AS TafType,
+           TRY_CAST(SUBSTRING(v, CHARINDEX(':', v)+1, 30) AS NUMERIC(18,0)) AS SiTaf
+    INTO #Taf
+    FROM (SELECT LTRIM(RTRIM(value)) AS v FROM dbo.Tss_StdStringSplitUdf(ISNULL(@TafSelected,''), ',')) s
+    WHERE v LIKE '%:%'
+
+    DECLARE @AccFilter VARCHAR(MAX)=''
+    IF EXISTS (SELECT 1 FROM #Pfx)
+        SET @AccFilter = ' AND EXISTS (SELECT 1 FROM #Pfx p WHERE cBook.Cod_AccountCode LIKE p.Pfx + ''%'')'
+    ELSE IF ISNULL(@SiAccCodeBook,'')<>''
+        SET @AccFilter = ' AND cBook.SiAccCodeBook IN (SELECT SiSel FROM dbo.Tss_StdStringSiFindUdf(''' + @SiAccCodeBook + '''))'
+
+    DECLARE @TafFilter VARCHAR(1000)=''
+    IF EXISTS (SELECT 1 FROM #Taf)
+        SET @TafFilter = ' AND EXISTS (SELECT 1 FROM #Taf t WHERE (t.TafType=0 AND vDet.SiPubPersonsSpec1=t.SiTaf) OR (t.TafType=1 AND vDet.SiPubCostCenter1=t.SiTaf) OR (t.TafType=2 AND vDet.SiPubProjects1=t.SiTaf))'
+    ELSE IF ISNULL(@SiSelected,'')<>'' AND @TafName IS NOT NULL
+        SET @TafFilter = ' AND vDet.' + @TafName + ' = ' + @SiSelected
+
+    DECLARE @AccAllDocs SMALLINT = dbo.Tss_StdFindSystemParamValue('AccAllDocs')
+
+    DECLARE @HiddenFilter VARCHAR(500)
+    IF dbo.Tss_StdFindIfUserIsInGroup(@SiUser,'AccStar') = 1
+        SET @HiddenFilter = ''
     ELSE
-        SET @Whr = ' Where ' + @Condition
+        SET @HiddenFilter = ' AND (vDet.Sta_IsHidden = 0 OR vDet.Sta_IsHidden IS NULL) '
+
+    SELECT SiAccFinancePeriodToPlace INTO #TempTable FROM dbo.Tss_AccFinancePeriodToPlace
+    WHERE SiPubSubLocations IN (SELECT * FROM dbo.Tss_StdStringSiFindUdf(@SiPubSubLocations))
+
+    -- -------------------------------------------------------------------
+    -- #TmpVchTaf: filtered voucher lines for the requested date range
+    -- -------------------------------------------------------------------
+    CREATE TABLE #TmpVchTaf (
+        SiAccVoucher_Hd      NUMERIC       NULL,
+        Dat_VhedDate         VARCHAR(10)   NULL,
+        Num_VDetRow          INT           NULL,
+        Des_VdetDesc         NVARCHAR(4000)NULL,
+        Num_VdetDebtAmount   BIGINT        NULL,
+        Num_VdetCreditAmount BIGINT        NULL,
+        Num_VhedFinalNo      DECIMAL(18,0) NULL,
+        Num_VhedSubNo        DECIMAL(18,0) NULL,
+        Cod_AccountCode      VARCHAR(50)   NULL,
+        Des_AccountDesc      NVARCHAR(200) NULL,
+        TafCode              VARCHAR(50)   NULL,
+        TafName              NVARCHAR(401) NULL
+    )
+
+    DECLARE @StatusFilter VARCHAR(100) =
+        CASE WHEN @AccAllDocs=0
+             THEN 'vHed.Sta_VochStatus >= 3 AND vHed.Sta_VochStatus <> 5 AND '
+             ELSE 'vHed.Sta_VochStatus >= 3 AND ' END
+
+    DECLARE @SqlTxt NVARCHAR(MAX) = N'
+    SELECT
+        vHed.SiAccVoucher_Hd,
+        vHed.Dat_VhedDate,
+        vDet.Num_VDetRow,
+        Des_VdetDesc = CAST(CASE WHEN Tss_AccVoucherType.Sta_VoucherTypeGroup IN (4,5)
+                                 THEN ISNULL(vDet.Des_VdetDesc,'''')
+                                 ELSE vDet.Des_VdetDesc
+                            END AS NVARCHAR(4000)),
+        CAST(vDet.Num_VdetDebtAmount   AS BIGINT) AS Num_VdetDebtAmount,
+        CAST(vDet.Num_VdetCreditAmount AS BIGINT) AS Num_VdetCreditAmount,
+        CAST(vHed.Num_VhedFinalNo      AS DECIMAL(18,0)) AS Num_VhedFinalNo,
+        CAST(vHed.Num_VhedSubNo        AS DECIMAL(18,0)) AS Num_VhedSubNo,
+        CAST(cBook.Cod_AccountCode     AS VARCHAR(50))   AS Cod_AccountCode,
+        CAST(cBook.Des_AccountDesc     AS NVARCHAR(200)) AS Des_AccountDesc,
+        CAST(COALESCE(pv.Cod_PubPersonCode, cc.Cod_CostCenterCode, pr.Cod_ProjectsCode, '''') AS VARCHAR(50)) AS TafCode,
+        CAST(COALESCE(pv.Des_FullName, cc.Des_CostCenterName, pr.Des_ProjectsThemeDesc, '''') AS NVARCHAR(401)) AS TafName
+    FROM Tss_AccCodeBook cBook
+    INNER JOIN Tss_AccVoucher_Dt vDet ON cBook.SiAccCodeBook = vDet.SiAccCodeBook
+    INNER JOIN Tss_AccVoucher_Hd vHed ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd
+    INNER JOIN Tss_AccVoucherType ON vHed.SiAccVoucherType = Tss_AccVoucherType.SiAccVoucherType
+    LEFT JOIN Tss_PubPersonsViw pv ON vDet.SiPubPersonsSpec1 = pv.SiPubPersonsSpec
+    LEFT JOIN Tss_PubCostCenter cc ON vDet.SiPubCostCenter1 = cc.SiPubCostCenter
+   LEFT JOIN Tss_PubProjects    pr ON vDet.SiPubProjects1   = pr.SiPubProjects
+    WHERE ' + @StatusFilter + N'
+        vHed.SiAccFinancePeriodToPlace IN (SELECT SiAccFinancePeriodToPlace FROM #TempTable)
+        AND vHed.Dat_VhedDate BETWEEN ''' + @DsFromDate + N''' AND ''' + @DsToDate + N'''
+        ' + @AccFilter + N'
+        ' + @TafFilter + N'
+        ' + @HiddenFilter + N'
+        ' + @WhType
+
+    -- Combine the two optional WHERE wrappers into a single clause
+    DECLARE @CombinedWhere VARCHAR(MAX) = ''
+    IF @InternalWhere <> '' AND @Where <> ''
+        SET @CombinedWhere = @InternalWhere + ' AND ' + SUBSTRING(@Where, 8, LEN(@Where))
+    ELSE IF @InternalWhere <> ''
+        SET @CombinedWhere = @InternalWhere
+    ELSE
+        SET @CombinedWhere = @Where
+
+    -- NOTE: no ORDER BY inside INSERT
+    DECLARE @InsertSql NVARCHAR(MAX) = N'
+    INSERT INTO #TmpVchTaf
+    SELECT * FROM (' + @SqlTxt + N') AS Ccc
+    ' + @CombinedWhere
+
+    BEGIN TRY
+        EXEC sp_executesql @InsertSql
+    END TRY
+    BEGIN CATCH
+        PRINT 'Error inserting into #TmpVchTaf: ' + ERROR_MESSAGE()
+    END CATCH
+
+    -- -------------------------------------------------------------------
+    -- #TmpVchTafMandeh: opening balance (before @DsFromDate)
+    -- -------------------------------------------------------------------
+    CREATE TABLE #TmpVchTafMandeh (
+        Num_VdetDebtAmount   BIGINT NULL,
+        Num_VdetCreditAmount BIGINT NULL
+    )
+
+    DECLARE @SqlTxtMandeh NVARCHAR(MAX) = N'
+    SELECT
+        CAST(SUM(vDet.Num_VdetDebtAmount)   AS BIGINT) AS Num_VdetDebtAmount,
+        CAST(SUM(vDet.Num_VdetCreditAmount) AS BIGINT) AS Num_VdetCreditAmount
+    FROM Tss_AccCodeBook cBook
+    INNER JOIN Tss_AccVoucher_Dt vDet ON cBook.SiAccCodeBook = vDet.SiAccCodeBook
+    INNER JOIN Tss_AccVoucher_Hd vHed ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd
+    WHERE ' + @StatusFilter + N'
+        vHed.SiAccFinancePeriodToPlace IN (SELECT SiAccFinancePeriodToPlace FROM #TempTable)
+        AND vHed.Dat_VhedDate BETWEEN ''1385/01/01'' AND ''' + dbo.Tss_StdOneDayDecUdf(@DsFromDate) + N'''
+        ' + @AccFilter + N'
+        ' + @TafFilter + N'
+        ' + @HiddenFilter + N'
+        ' + @WhType
+
+    DECLARE @InsertMandehSql NVARCHAR(MAX) = N'
+    INSERT INTO #TmpVchTafMandeh
+    SELECT * FROM (' + @SqlTxtMandeh + N') AS Ccc'
+
+    BEGIN TRY
+        EXEC sp_executesql @InsertMandehSql
+    END TRY
+    BEGIN CATCH
+        PRINT 'Error inserting into #TmpVchTafMandeh: ' + ERROR_MESSAGE()
+    END CATCH
+
+    -- -------------------------------------------------------------------
+    -- #TmpVchTafBaBiMandeh: opening row + in-range rows
+    -- -------------------------------------------------------------------
+    CREATE TABLE #TmpVchTafBaBiMandeh (
+        SiAccVoucher_Hd      NUMERIC        NULL,
+        Dat_VhedDate         VARCHAR(10)    NULL,
+        Num_VDetRow          INT            NULL,
+        Des_VdetDesc         NVARCHAR(4000) NULL,
+        Num_VdetDebtAmount   BIGINT         NULL,
+        Num_VdetCreditAmount BIGINT         NULL,
+        Num_VhedFinalNo      DECIMAL(18,0)  NULL,
+        Num_VhedSubNo        DECIMAL(18,0)  NULL,
+        Cod_AccountCode      VARCHAR(50)    NULL,
+        Des_AccountDesc      NVARCHAR(200)  NULL,
+        TafCode              VARCHAR(50)    NULL,
+        TafName              NVARCHAR(401)  NULL
+    )
+
+    DECLARE @SqlTxtBaBiMandeh NVARCHAR(MAX)
+    IF @StaMandehOrNot = 1
+    BEGIN
+        SET @SqlTxtBaBiMandeh = N'
+        SELECT
+            CAST(0 AS NUMERIC)        AS SiAccVoucher_Hd,
+            CAST('''' AS VARCHAR(10)) AS Dat_VhedDate,
+            0                         AS Num_VDetRow,
+            CAST(N''مانده از قبل'' AS NVARCHAR(4000)) AS Des_VdetDesc,
+            CAST(ISNULL(Num_VdetDebtAmount, 0)   AS BIGINT) AS Num_VdetDebtAmount,
+            CAST(ISNULL(Num_VdetCreditAmount, 0) AS BIGINT) AS Num_VdetCreditAmount,
+       CAST(0 AS DECIMAL(18,0))  AS Num_VhedFinalNo,
+            CAST(0 AS DECIMAL(18,0))  AS Num_VhedSubNo,
+            CAST('''' AS VARCHAR(50)) AS Cod_AccountCode,
+            CAST('''' AS NVARCHAR(200)) AS Des_AccountDesc,
+            CAST('''' AS VARCHAR(50)) AS TafCode,
+            CAST('''' AS NVARCHAR(401)) AS TafName
+        FROM #TmpVchTafMandeh
+        UNION ALL
+        SELECT
+            SiAccVoucher_Hd, Dat_VhedDate, Num_VDetRow, Des_VdetDesc,
+            Num_VdetDebtAmount, Num_VdetCreditAmount, Num_VhedFinalNo, Num_VhedSubNo,
+            Cod_AccountCode, Des_AccountDesc, TafCode, TafName
+        FROM #TmpVchTaf'
+    END
+    ELSE
+    BEGIN
+        SET @SqlTxtBaBiMandeh = N'
+        SELECT
+            SiAccVoucher_Hd, Dat_VhedDate, Num_VDetRow, Des_VdetDesc,
+            Num_VdetDebtAmount, Num_VdetCreditAmount, Num_VhedFinalNo, Num_VhedSubNo,
+            Cod_AccountCode, Des_AccountDesc, TafCode, TafName
+        FROM #TmpVchTaf'
+    END
+
+    DECLARE @InsertCombineSql NVARCHAR(MAX) = N'
+    INSERT INTO #TmpVchTafBaBiMandeh
+    SELECT * FROM (' + @SqlTxtBaBiMandeh + N') AS Ccc
+    ' + @CombinedWhere
+
+    BEGIN TRY
+        EXEC sp_executesql @InsertCombineSql
+    END TRY
+    BEGIN CATCH
+        PRINT 'Error inserting into #TmpVchTafBaBiMandeh: ' + ERROR_MESSAGE()
+    END CATCH
+
+    -- -------------------------------------------------------------------
+    -- Final result: running balance over the ordered set
+    -- -------------------------------------------------------------------
+    ;WITH FinalData AS (
+        SELECT
+            CAST(ROW_NUMBER() OVER (ORDER BY Dat_VhedDate, SiAccVoucher_Hd, Num_VDetRow) AS DECIMAL(18,0)) AS MyId,
+            SiAccVoucher_Hd,
+            CAST(Num_VhedFinalNo AS DECIMAL(18,0)) AS Num_VhedFinalNo,
+            CAST(Num_VhedSubNo   AS DECIMAL(18,0)) AS Num_VhedSubNo,
+            Dat_VhedDate,
+            LEFT(Dat_VhedDate, 7) AS Dat_VhedDateMonth,
+            Num_VDetRow,
+            Des_VdetDesc,
+            CAST(Num_VdetDebtAmount   AS BIGINT) AS Num_VdetDebtAmount,
+            CAST(Num_VdetCreditAmount AS BIGINT) AS Num_VdetCreditAmount,
+            CAST(Num_VdetDebtAmount - Num_VdetCreditAmount AS BIGINT) AS Acc_Rest,
+            Cod_AccountCode, Des_AccountDesc, TafCode, TafName
+        FROM #TmpVchTafBaBiMandeh
+    ),
+    RunningSum AS (
+        SELECT *,
+               SUM(Acc_Rest) OVER (ORDER BY MyId ROWS UNBOUNDED PRECEDING) AS Acc_Rest_Sum
+        FROM FinalData
+    )
+    SELECT
+        MyId, SiAccVoucher_Hd, Num_VhedFinalNo, Num_VhedSubNo,
+        Dat_VhedDate, Dat_VhedDateMonth, Num_VDetRow, Des_VdetDesc,
+        Num_VdetDebtAmount, Num_VdetCreditAmount, Acc_Rest, Acc_Rest_Sum,
+        Cod_AccountCode, Des_AccountDesc, TafCode, TafName
+    FROM RunningSum
+    ORDER BY MyId
+
+    DROP TABLE IF EXISTS #TempTable
+    DROP TABLE IF EXISTS #TmpVchTaf
+    DROP TABLE IF EXISTS #TmpVchTafMandeh
+    DROP TABLE IF EXISTS #TmpVchTafBaBiMandeh
+    DROP TABLE IF EXISTS #Pfx
+    DROP TABLE IF EXISTS #Taf
 END
 
-	if @SiCheks<>''
-		Set @Whr = @Whr + ' AND (cheks1.SiRapReceivedCheque in (Select SiSel From dbo.Tss_StdStringSiFindUdf('+''''+@SiCheks+''''+')))'
+GO
 
-	if @StaDateFilter=0
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-					Set @Whr = @Whr + ' AND (cheks1.RegDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-			Else
-					Set @Whr = @Whr + ' (cheks1.RegDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-	End
+alter PROCEDURE Tss_PubUntBankVStp
+(  
+   @InternalWhere VarChar(8000)='',
+   @Where VarChar(8000)='',
+   @Order VarChar(8000)=''
+) AS
+If @InternalWhere<>''
+   Set @InternalWhere=' Where '+@InternalWhere
+If @Where<>''
+   Set @Where=' Where '+@Where
+If @Order<>''
+   Set @Order=' Order By '+@Order
+Exec(
+'Select * From
+(
+   Select * From
+   (
+   SELECT 
+		pBank.Des_CodeDescription,
+		pBank.SiPubPersonsSpec, 
+		pBank.Cod_PubPersonCode, 
+		pBank.Des_PubPersonName1, 
+		pBank.Des_PersonAddress, 
+		pBank.Des_PersonPhons, 
+		pBank.Des_Person_FaxNo, 
+		pBank.SiPubGeoPlacCity, 
+		pBank.Cod_BankDefAccountCode, 
+		pBank.Cod_BankDefBranchCode, 
+		pBank.Num_BankDefMaxPayment, 
+		pBank.Num_BankDefCashInStart, 
+		pBank.Dat_BankDefAccRegDate, 
+		pBank.Dat_BankDefAccCloseDate, 
+		dbo.Tss_PubGeoPlac.Cod_GeoPlaceCode, 
+		dbo.Tss_PubGeoPlac.Des_GeoPlaceName, 
+		pBank.Sta_PubPersonsGroup, 
+		pBank.StmPubPersonsSpec, 
+		pBank.SiPubCustomCodesBankType, 
+		BankTp.Cod_CustomCodesCode, 
+		BankTp.Des_CustomCodesDesc,
+		pBank.Dat_BankFristMoney, 
+		pBank.Num_BankFirstMoney,
+		pBank.Des_BankAccountOwnerName, 
+		Tss_PubSubLocations.Cod_SubLocCode, 
+		Tss_PubSubLocations.Des_SubLocName, 
+        pBank.SiPubSubLocations,
+		pBank.Des_AccountSheba,
+		pBank.Des_AccountOwnerNationalCode,
+		pBank.Des_AccountRegisterNo,
+		pBank.Des_AccountOwnerAddress,
+		pBank.Des_AccountOwnerTel
+FROM        
+	Tss_PubSubLocations RIGHT OUTER JOIN
+	Tss_PubPersonsSpec AS pBank ON Tss_PubSubLocations.SiPubSubLocations = pBank.SiPubSubLocations LEFT OUTER JOIN
+	Tss_PubCustomCodes AS BankTp ON pBank.SiPubCustomCodesBankType = BankTp.SiPubCustomCodes LEFT OUTER JOIN
+	Tss_PubGeoPlac ON pBank.SiPubGeoPlacCity = Tss_PubGeoPlac.SiPubGeoPlac
+WHERE     
+	(pBank.Sta_PubPersonsGroup = 5)
+   ) Ccc  '+@InternalWhere+'
+) CalcSel ' + @Where + @Order)
 
-	if @StaDateFilter=1
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-					Set @Whr = @Whr + ' AND (cheks1.UsanceDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-			Else
-					Set @Whr = @Whr + ' (cheks1.UsanceDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-	End
+GO
 
-	if @StaDateFilter=2
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeVosoolDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-			Else
-					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeVosoolDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-	End
+-- 1) Des_AccountSheba
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.Tss_PubPersonsSpec')
+      AND name = N'Des_AccountSheba'
+)
+BEGIN
+    ALTER TABLE [dbo].[Tss_PubPersonsSpec]
+        ADD [Des_AccountSheba] [varchar](200) NULL;
+    PRINT 'Added column: Des_AccountSheba';
+END
+ELSE
+    PRINT 'Column already exists, skipped: Des_AccountSheba';
+GO
 
-	if @StaDateFilter=3
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeBargashtDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-			Else
-					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeBargashtDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-	End
+-- 2) Des_AccountOwnerNationalCode
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.Tss_PubPersonsSpec')
+      AND name = N'Des_AccountOwnerNationalCode'
+)
+BEGIN
+    ALTER TABLE [dbo].[Tss_PubPersonsSpec]
+        ADD [Des_AccountOwnerNationalCode] [varchar](50) NULL;
+    PRINT 'Added column: Des_AccountOwnerNationalCode';
+END
+ELSE
+    PRINT 'Column already exists, skipped: Des_AccountOwnerNationalCode';
+GO
 
-	if @StaDateFilter=4
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeToPerDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-			Else
-					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeToPerDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-	End
+-- 3) Des_AccountRegisterNo
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.Tss_PubPersonsSpec')
+      AND name = N'Des_AccountRegisterNo'
+)
+BEGIN
+    ALTER TABLE [dbo].[Tss_PubPersonsSpec]
+        ADD [Des_AccountRegisterNo] [varchar](50) NULL;
+    PRINT 'Added column: Des_AccountRegisterNo';
+END
+ELSE
+    PRINT 'Column already exists, skipped: Des_AccountRegisterNo';
+GO
 
-	if @StaDateFilter=5
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeToBankDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-			Else
-					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeToBankDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-	End
+-- 4) Des_AccountOwnerAddress
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.Tss_PubPersonsSpec')
+      AND name = N'Des_AccountOwnerAddress'
+)
+BEGIN
+    ALTER TABLE [dbo].[Tss_PubPersonsSpec]
+        ADD [Des_AccountOwnerAddress] [varchar](2000) NULL;
+    PRINT 'Added column: Des_AccountOwnerAddress';
+END
+ELSE
+    PRINT 'Column already exists, skipped: Des_AccountOwnerAddress';
+GO
 
-	if @StaDateFilter=6
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-					Set @Whr = @Whr + ' AND (cheks1.Dat_RapReceivedChequeToAgainDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-			Else
-					Set @Whr = @Whr + ' (cheks1.Dat_RapReceivedChequeToAgainDate BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-	End
+-- 5) Des_AccountOwnerTel
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.Tss_PubPersonsSpec')
+      AND name = N'Des_AccountOwnerTel'
+)
+BEGIN
+    ALTER TABLE [dbo].[Tss_PubPersonsSpec]
+        ADD [Des_AccountOwnerTel] [varchar](50) NULL;
+    PRINT 'Added column: Des_AccountOwnerTel';
+END
+ELSE
+    PRINT 'Column already exists, skipped: Des_AccountOwnerTel';
+GO
 
-	if @StaDateFilter=7
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-					Set @Whr = @Whr + ' AND (cheks1.Dat_EsterdadToPer BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-			Else
-					Set @Whr = @Whr + ' (cheks1.Dat_EsterdadToPer BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-	End
-
-	if @StaDateFilter=8
-	Begin
-	if isnull(@Whr,'') <> ' Where '
-					Set @Whr = @Whr + ' AND (cheks1.Dat_EsterdadToCashier BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-			Else
-					Set @Whr = @Whr + ' (cheks1.Dat_EsterdadToCashier BETWEEN '+''''+@RegDate+''''+' AND '+''''+@RegDate2+''''+')'
-	End
-
-    if @SayadiSql <> ''
-        Set @Whr = @Whr + @SayadiSql
-
-	-- Handle ORDER BY for aggregation
-	IF @StaSumPers = 1
-	BEGIN
-		-- Add GROUP BY for GiverCode and GiverName
-		Set @SqlText = @SqlText + @Whr + ' GROUP BY cheks1.GiverCode, cheks1.GiverName ORDER BY cheks1.GiverName'
-	END
-	ELSE
-	BEGIN
-		if @Sta_ChekRecieptMainOrNot = 0	
-			Set @SqlText = @SqlText + @Whr + ') ccc order by UsanceDate'
-		
-		if @Sta_ChekRecieptMainOrNot = 1	
-			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeVosoolDate'
-
-		if @Sta_ChekRecieptMainOrNot = 2	
-			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeBargashtDate'
-
-		if @Sta_ChekRecieptMainOrNot = 3	
-			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeToPerDate'
-
-		if @Sta_ChekRecieptMainOrNot = 4	
-			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeToBankDate'
-
-		if @Sta_ChekRecieptMainOrNot = 5	
-			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_RapReceivedChequeToAgainDate'
-
-		if @Sta_ChekRecieptMainOrNot = 6	
-			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_EsterdadToPer'
-
-		if @Sta_ChekRecieptMainOrNot = 7	
-			Set @SqlText = @SqlText + @Whr + ') ccc order by Dat_EsterdadToCashier'
-
-		if @Sta_ChekRecieptMainOrNot = 8	
-			Set @SqlText = @SqlText + @Whr + ') ccc order by RegDate'
-	END
-
-    if @SayadiSql <> ''
-        
-if @Whr<>''
-	Set @Whr = @Whr + ' and  (SiPubSubLocations in  (SELECT DISTINCT 
-		Tss_AccFinancePeriodToPlace.SiPubSubLocations
-	FROM         
-		Tss_AccUserToFinancePeriodAndPlace INNER JOIN
-		Tss_AccFinancePeriodToPlace ON 
-		Tss_AccUserToFinancePeriodAndPlace.SiAccFinancePeriodToPlace = Tss_AccFinancePeriodToPlace.SiAccFinancePeriodToPlace
-	WHERE     
-		(Tss_AccUserToFinancePeriodAndPlace.SiPubPersonsSpec = '+convert(varchar,@SiUser)+')))'
-else
-	Set @Whr = @Whr + ' where  (SiPubSubLocations in  (SELECT DISTINCT 
-		Tss_AccFinancePeriodToPlace.SiPubSubLocations
-	FROM         
-		Tss_AccUserToFinancePeriodAndPlace INNER JOIN
-		Tss_AccFinancePeriodToPlace ON 
-		Tss_AccUserToFinancePeriodAndPlace.SiAccFinancePeriodToPlace = Tss_AccFinancePeriodToPlace.SiAccFinancePeriodToPlace
-	WHERE     
-		(Tss_AccUserToFinancePeriodAndPlace.SiPubPersonsSpec = @'+convert(varchar,@SiUser)+')))'
-		
-	print @SqlText
-	
-	exec(@SqlText)
-End
-Else
-Begin
-	-- Handle the ELSE block when @GhabzNo is not empty
-	IF @StaSumPers = 1
-	BEGIN
-		SELECT 
-			CAST(NULL AS varchar(50)) AS GhabzNo,
-			CAST(NULL AS varchar(200)) AS BankName,
-			cheks1.GiverCode,
-			cheks1.GiverName,
-			CAST(NULL AS varchar(1)) AS RecieverCode,
-			CAST(NULL AS varchar(1)) AS RecieverName,
-			CAST(NULL AS varchar(10)) AS RegDate,
-			CAST(NULL AS varchar(10)) AS UsanceDate,
-			SUM(cheks1.ChequeAmount) AS ChequeAmount,
-			CAST(NULL AS varchar(50)) AS BankBranchCode,
-			CAST(NULL AS varchar(50)) AS ChequeSerial,
-			CAST(NULL AS varchar(500)) AS Tozihat,
-			CAST(NULL AS varchar(1500)) AS RecieptTozih,
-			CAST(NULL AS smallint) AS Sta_ChekRecieptMainOrNot,
-			CAST(NULL AS numeric(18,0)) AS SiRapReceivedCheque,
-			CAST(NULL AS varchar(50)) AS ContractNo,
-			CAST(NULL AS numeric(18,0)) AS SiPubPersonsSpec,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeCngDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeVosoolDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeBargashtDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeCancelDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToPerDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToBankDate,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeHoghughiDate,
-			CAST(NULL AS numeric(18,0)) AS SiPubSubLocations,
-			CAST(NULL AS smallint) AS Sta_RapReceivedChequeState,
-			CAST(NULL AS numeric(18,0)) AS SiRapCashDefine,
-			CAST(NULL AS numeric(18,0)) AS SiPubCustomCodes,
-			CAST(NULL AS varchar(50)) AS Cod_PubPersonCode,
-			CAST(NULL AS varchar(401)) AS Des_FullName,
-			CAST(NULL AS varchar(50)) AS GirandehCode,
-			CAST(NULL AS varchar(10)) AS Dat_RapReceivedChequeToAgainDate,
-			CAST(NULL AS varchar(50)) AS Dat_EsterdadToPer,
-			CAST(NULL AS varchar(50)) AS Dat_EsterdadToCashier,
-			CAST(NULL AS varchar(401)) AS GirandehDesc,
-			CAST(NULL AS varchar(50)) AS Des_ReceivedChequeSayadiCode,
-			CAST(NULL AS varchar(50)) AS Des_ReceivedChequeSayadiNationalCode,
-			CAST(NULL AS smallint) AS Sta_IsChecqueElectronic
-		FROM         
-			Tss_RapRecCheckGhabzRep1Vw cheks1 LEFT OUTER JOIN
-			Tss_RapRecCheckGhabzRep2Vw cheks2 ON cheks1.SiRapReceivedCheque = cheks2.SiRapReceivedCheque
-		WHERE   
-			(cheks1.Sta_CheckToBankState <> 4) and
-			(cheks1.Sta_CheckToBankState <> 3) and 	
-			(cheks1.GhabzNo = @GhabzNo) and
-			(cheks1.Sta_ChekRecieptMainOrNot = @Sta_ChekRecieptMainOrNot )
-		GROUP BY cheks1.GiverCode, cheks1.GiverName
-		ORDER BY cheks1.GiverName
-	END
-	ELSE
-	BEGIN
-		SELECT    distinct 
-			cheks1.GhabzNo, 
-			cheks1.BankName, 
-			'' GiverCode, 
-			'' GiverName, 
-			cheks1.RecieverCode, 
-			cheks1.RecieverName, 
-			cheks1.RegDate, 
-			cheks1.UsanceDate, 
-			cheks1.ChequeAmount, 
-			cheks1.BankBranchCode, 
-			cheks1.ChequeSerial, 
-			cheks1.Tozihat, 
-			cheks1.RecieptTozih, 
-			cheks1.Sta_ChekRecieptMainOrNot, 
-			cheks1.SiRapReceivedCheque, 
-			cheks2.Cod_SaleAgreement AS ContractNo, 
-			cheks1.SiPubPersonsSpec, 
-			cheks1.Dat_RapReceivedChequeCngDate, 
-			cheks1.Dat_RapReceivedChequeVosoolDate, 
-			cheks1.Dat_RapReceivedChequeBargashtDate, 
-			cheks1.Dat_RapReceivedChequeCancelDate, 
-			cheks1.Dat_RapReceivedChequeToPerDate, 
-			cheks1.Dat_RapReceivedChequeToBankDate, 
-			cheks1.Dat_RapReceivedChequeHoghughiDate, 
-			cheks1.SiPubSubLocations, 
-			cheks1.Sta_RapReceivedChequeState, 
-			cheks1.SiRapCashDefine, 
-			cheks1.SiPubCustomCodes, 
-			cheks1.Cod_PubPersonCode, 
-			cheks1.Des_FullName,
-			cheks1.GirandehCode, 
-			cheks1.GirandehDesc,
-			cheks1.Dat_EsterdadToCashier,
-			cheks1.Dat_EsterdadToPer,
-			cheks1.Des_ReceivedChequeSayadiCode,
-			cheks1.Des_ReceivedChequeSayadiNationalCode,
-			cheks1.Dat_RapReceivedChequeToAgainDate,
-			cheks1.Sta_IsChecqueElectronic
-		FROM         
-			Tss_RapRecCheckGhabzRep1Vw cheks1 LEFT OUTER JOIN
-			Tss_RapRecCheckGhabzRep2Vw cheks2 ON cheks1.SiRapReceivedCheque = cheks2.SiRapReceivedCheque
-		WHERE   
-			(cheks1.Sta_CheckToBankState <> 4) and
-			(cheks1.Sta_CheckToBankState <> 3) and 	
-			(cheks1.GhabzNo = @GhabzNo) and
-			(cheks1.Sta_ChekRecieptMainOrNot = @Sta_ChekRecieptMainOrNot )
-	END
+alter Procedure Tss_PubUntBankIudStp
+(  
+	@Err_Code Int OutPut,
+	@SiPubPersonsSpec Numeric OutPut,
+	@SiPubGeoPlacCity numeric=Null,
+	@SiPubCustomCodesBankType numeric=Null,
+	@Cod_PubPersonCode varchar(50)='',
+	@Des_PubPersonName1 varchar(200)='',
+	@Des_PersonAddress varchar(200)='',
+	@Des_PersonPhons varchar(200)='',  
+	@Des_Person_FaxNo varchar(200)='', 
+	@Cod_BankDefAccountCode varchar(50)='', 
+	@Cod_BankDefBranchCode varchar(50)='', 
+	@Num_BankDefMaxPayment numeric=0,
+	@Num_BankDefCashInStart numeric=0,
+	@Dat_BankDefAccRegDate varchar(10)='', 
+	@Dat_BankDefAccCloseDate varchar(10)='',
+	@Dat_BankFristMoney varchar(10)='',
+	@Num_BankFirstMoney Numeric=0,  
+	@Des_BankAccountOwnerName varchar(500)='',
+	@SiPubSubLocations numeric=null,
+	@Des_CodeDescription varchar(2000)='',
+	@Des_AccountSheba varchar(200)='',
+	@Des_AccountOwnerNationalCode varchar(50)='',
+	@Des_AccountRegisterNo varchar(50)='',
+	@Des_AccountOwnerAddress varchar(2000)='',
+	@Des_AccountOwnerTel varchar(50)='',
+	@StmPubPersonsSpec TimeStamp=0,  
+	@SiUser Numeric,  
+	@FlgInsUpdDel SmallInt  
+) As  
+Declare  
+	@Sta_PubPersonsGroup SmallInt  
+Set @Sta_PubPersonsGroup=5  
+If @FlgInsUpdDel=0  
+Begin  
+	Insert Into dbo.Tss_PubPersonsSpec  
+	(  
+		SiPubGeoPlacCity,  
+		SiPubCustomCodesBankType,
+		Cod_PubPersonCode,  
+		Des_PubPersonName1,  
+		Des_PersonAddress,  
+		Des_PersonPhons,  
+		Des_Person_FaxNo,  
+		Sta_PubPersonsGroup,
+		Cod_BankDefAccountCode, 
+		Cod_BankDefBranchCode, 
+		Num_BankDefMaxPayment, 
+		Num_BankDefCashInStart, 
+		Dat_BankDefAccRegDate,  
+		Dat_BankDefAccCloseDate,  
+		Dat_BankFristMoney,
+		Num_BankFirstMoney,
+		Des_BankAccountOwnerName,
+		Sta_Enable,
+		SiPubSubLocations,
+		Des_CodeDescription,
+		Des_AccountSheba,
+		Des_AccountOwnerNationalCode,
+		Des_AccountRegisterNo,
+		Des_AccountOwnerAddress,
+		Des_AccountOwnerTel
+	)  
+	Values  
+	(  
+		@SiPubGeoPlacCity,  
+		@SiPubCustomCodesBankType,
+		@Cod_PubPersonCode,  
+		@Des_PubPersonName1,  
+		@Des_PersonAddress,  
+		@Des_PersonPhons,  
+		@Des_Person_FaxNo,  
+		@Sta_PubPersonsGroup  ,
+		@Cod_BankDefAccountCode, 
+		@Cod_BankDefBranchCode, 
+		@Num_BankDefMaxPayment, 
+		@Num_BankDefCashInStart, 
+		@Dat_BankDefAccRegDate,  
+		@Dat_BankDefAccCloseDate,
+		@Dat_BankFristMoney,
+		@Num_BankFirstMoney,
+		@Des_BankAccountOwnerName,
+		0,
+		@SiPubSubLocations,
+		@Des_CodeDescription,
+		@Des_AccountSheba,
+		@Des_AccountOwnerNationalCode,
+		@Des_AccountRegisterNo,
+		@Des_AccountOwnerAddress,
+		@Des_AccountOwnerTel
+	)  
+	Set @SiPubPersonsSpec=Scope_Identity()  
+	If IsNull(@SiPubPersonsSpec,0)=0  
+	Begin  
+		Set @SiPubPersonsSpec=0  
+		Set @Err_Code=400  
+	End  
+	Return  
+End  
+If @FlgInsUpdDel=1  
+Begin  
+	Set @Err_Code=0  
+	If Exists
+	(
+		Select StmPubPersonsSpec From dbo.Tss_PubPersonsSpec  
+		Where (SiPubPersonsSpec=@SiPubPersonsSpec) And (StmPubPersonsSpec=@StmPubPersonsSpec)
+	)
+	Begin  
+		Update dbo.Tss_PubPersonsSpec Set
+			SiPubCustomCodesBankType=@SiPubCustomCodesBankType,  
+			SiPubGeoPlacCity=@SiPubGeoPlacCity,  
+			Cod_PubPersonCode=@Cod_PubPersonCode,  
+			Des_PubPersonName1=@Des_PubPersonName1,  
+			Des_PersonAddress=@Des_PersonAddress,  
+			Des_PersonPhons=@Des_PersonPhons,  
+			Des_Person_FaxNo=@Des_Person_FaxNo,
+			Cod_BankDefAccountCode=@Cod_BankDefAccountCode, 
+			Cod_BankDefBranchCode=@Cod_BankDefBranchCode, 
+			Num_BankDefMaxPayment=@Num_BankDefMaxPayment, 
+			Num_BankDefCashInStart=@Num_BankDefCashInStart, 
+			Dat_BankDefAccRegDate=@Dat_BankDefAccRegDate,  
+			Dat_BankDefAccCloseDate=@Dat_BankDefAccCloseDate,  
+			Dat_BankFristMoney=@Dat_BankFristMoney,
+			Num_BankFirstMoney=@Num_BankFirstMoney,
+			Des_BankAccountOwnerName=@Des_BankAccountOwnerName,
+			SiPubSubLocations=@SiPubSubLocations,
+			Des_CodeDescription=@Des_CodeDescription,
+			Des_AccountSheba=@Des_AccountSheba,
+			Des_AccountOwnerNationalCode=@Des_AccountOwnerNationalCode,
+			Des_AccountRegisterNo=@Des_AccountRegisterNo,
+			Des_AccountOwnerAddress=@Des_AccountOwnerAddress,
+			Des_AccountOwnerTel=@Des_AccountOwnerTel
+		Where (SiPubPersonsSpec=@SiPubPersonsSpec)  
+		Set @Err_Code=@@Error  
+		If @Err_Code<>0  
+			Set @Err_Code=401  
+		Return  
+	End  
+	ELse  
+		Set @Err_Code=402  
+End  
+If @FlgInsUpdDel=2  
+Begin  
+	Set @Err_Code=0  
+	If Exists
+	(
+		Select StmPubPersonsSpec From dbo.Tss_PubPersonsSpec  
+		Where (SiPubPersonsSpec=@SiPubPersonsSpec) And (StmPubPersonsSpec=@StmPubPersonsSpec)
+	)
+	Begin  
+		Delete From dbo.Tss_PubPersonsSpec Where (SiPubPersonsSpec=@SiPubPersonsSpec)  
+		Set @Err_Code=@@Error  
+		If @Err_Code<>0  
+			Set @Err_Code=4000  
+	End  
+	Else  
+		Set @Err_Code=4000  
+	Return  
 End
 
 GO
