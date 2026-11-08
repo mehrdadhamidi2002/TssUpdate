@@ -8643,25 +8643,25 @@ Exec(@SqlTxt)
 
 GO
 
-alter   PROCEDURE Tss_AccUntTafsiliReview_03VStp
+ALTER PROCEDURE dbo.Tss_AccUntTafsiliReview_03VStp
 (
-    @InternalWhere VARCHAR(8000)='',
-    @Where VARCHAR(8000)='',
-    @Order VARCHAR(8000)='',
-    @DsFromDate VARCHAR(10)='1399/01/01',
-    @DsToDate VARCHAR(10)='1399/09/07',
-    @SiAccFinancePeriod NUMERIC=20,
-    @SiPubSubLocations VARCHAR(500)='1,2',
-    @Sta_Start SMALLINT=0,
-    @Sta_End SMALLINT=0,
-    @Sta_Close SMALLINT=0,
-    @StaMandehOrNot SMALLINT=1,
-    @SiAccCodeBook VARCHAR(MAX)='',
-    @SiSelected VARCHAR(50)='',
-    @SiUser NUMERIC=1,
-    @AccCodePrefix VARCHAR(MAX)='',
-    @FlgTafType SMALLINT=-1,
-    @TafSelected VARCHAR(MAX)=''
+    @InternalWhere      VARCHAR(8000) = '',
+    @Where              VARCHAR(8000) = '',
+    @Order              VARCHAR(8000) = '',
+    @DsFromDate         VARCHAR(10)   = '1399/01/01',
+    @DsToDate           VARCHAR(10)   = '1399/09/07',
+    @SiAccFinancePeriod NUMERIC       = 20,
+    @SiPubSubLocations  VARCHAR(500)  = '1,2',
+    @Sta_Start          SMALLINT      = 0,
+    @Sta_End            SMALLINT      = 0,
+    @Sta_Close          SMALLINT      = 0,
+    @StaMandehOrNot     SMALLINT      = 1,
+    @SiAccCodeBook      VARCHAR(MAX)  = '',
+    @SiSelected         VARCHAR(50)   = '',
+    @SiUser             NUMERIC       = 1,
+    @AccCodePrefix      VARCHAR(MAX)  = '',
+    @FlgTafType         SMALLINT      = -1,
+    @TafSelected        VARCHAR(MAX)  = ''
 )
 AS
 BEGIN
@@ -8676,29 +8676,34 @@ BEGIN
     DROP TABLE IF EXISTS #Pfx
     DROP TABLE IF EXISTS #Taf
 
-    SET @InternalWhere = CASE WHEN @InternalWhere IS NOT NULL AND @InternalWhere<>'' THEN ' WHERE '+@InternalWhere ELSE '' END
-    SET @Where         = CASE WHEN @Where         IS NOT NULL AND @Where        <>'' THEN ' WHERE '+@Where         ELSE '' END
-    SET @Order         = CASE WHEN @Order         IS NOT NULL AND @Order        <>'' THEN ' ORDER BY '+@Order    ELSE '' END
+    SET @InternalWhere = CASE WHEN @InternalWhere IS NOT NULL AND @InternalWhere <> ''
+                              THEN ' WHERE ' + @InternalWhere ELSE '' END
+    SET @Where         = CASE WHEN @Where IS NOT NULL AND @Where <> ''
+                              THEN ' WHERE ' + @Where ELSE '' END
+    SET @Order         = CASE WHEN @Order IS NOT NULL AND @Order <> ''
+                              THEN ' ORDER BY ' + @Order ELSE '' END
 
     -- Build voucher-type exclusion list
     DECLARE @WhType VARCHAR(300) =
-        CASE WHEN @Sta_Start=0
-             THEN (SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=0)
+        CASE WHEN @Sta_Start = 0
+             THEN (SELECT STRING_AGG(SiAccVoucherType, ',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup = 0)
              ELSE '' END
 
-    SET @WhType = ISNULL(@WhType,'')
-                + CASE WHEN @Sta_End=0 AND @WhType<>'' THEN ',' ELSE '' END
-                + CASE WHEN @Sta_End=0
-                       THEN ISNULL((SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=1),'')
+    SET @WhType = ISNULL(@WhType, '')
+                + CASE WHEN @Sta_End = 0 AND @WhType <> '' THEN ',' ELSE '' END
+                + CASE WHEN @Sta_End = 0
+                       THEN ISNULL((SELECT STRING_AGG(SiAccVoucherType, ',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup = 1), '')
                        ELSE '' END
 
     SET @WhType = @WhType
-                + CASE WHEN @Sta_Close=0 AND @WhType<>'' THEN ',' ELSE '' END
-                + CASE WHEN @Sta_Close=0
-                       THEN ISNULL((SELECT STRING_AGG(SiAccVoucherType,',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup=3),'')
+                + CASE WHEN @Sta_Close = 0 AND @WhType <> '' THEN ',' ELSE '' END
+                + CASE WHEN @Sta_Close = 0
+                       THEN ISNULL((SELECT STRING_AGG(SiAccVoucherType, ',') FROM Tss_AccVoucherType WHERE Sta_VoucherTypeGroup = 3), '')
                        ELSE '' END
 
-    SET @WhType = CASE WHEN @WhType<>'' THEN ' AND vHed.SiAccVoucherType NOT IN ('+@WhType+')' ELSE '' END
+    SET @WhType = CASE WHEN @WhType <> ''
+                       THEN ' AND vHed.SiAccVoucherType NOT IN (' + @WhType + ')'
+                       ELSE '' END
 
     -- Determine which tafsil column to filter on
     DECLARE @TafName VARCHAR(100) =
@@ -8708,7 +8713,7 @@ BEGIN
             WHEN 2 THEN 'SiPubProjects1'
             ELSE
                 CASE (SELECT TOP 1 Sta_TafType1 FROM Tss_AccCodeBook
-                      WHERE SiAccCodeBook=(SELECT TOP 1 SiSel FROM dbo.Tss_StdStringSiFindUdf(@SiAccCodeBook)))
+                      WHERE SiAccCodeBook = (SELECT TOP 1 SiSel FROM dbo.Tss_StdStringSiFindUdf(@SiAccCodeBook)))
                     WHEN 1 THEN 'SiPubPersonsSpec1'
                     WHEN 2 THEN 'SiPubCostCenter1'
                     WHEN 3 THEN 'SiPubProjects1'
@@ -8719,59 +8724,62 @@ BEGIN
     -- Account-code prefixes
     SELECT LTRIM(RTRIM(value)) AS Pfx
     INTO #Pfx
-    FROM dbo.Tss_StdStringSplitUdf(ISNULL(@AccCodePrefix,''), ',')
-    WHERE LTRIM(RTRIM(value))<>''
+    FROM dbo.Tss_StdStringSplitUdf(ISNULL(@AccCodePrefix, ''), ',')
+    WHERE LTRIM(RTRIM(value)) <> ''
 
     -- Tafsil selection pairs (type:si)
-    SELECT TRY_CAST(LEFT(v, CHARINDEX(':', v)-1) AS INT) AS TafType,
-           TRY_CAST(SUBSTRING(v, CHARINDEX(':', v)+1, 30) AS NUMERIC(18,0)) AS SiTaf
+    SELECT TRY_CAST(LEFT(v, CHARINDEX(':', v) - 1) AS INT) AS TafType,
+           TRY_CAST(SUBSTRING(v, CHARINDEX(':', v) + 1, 30) AS NUMERIC(18, 0)) AS SiTaf
     INTO #Taf
-    FROM (SELECT LTRIM(RTRIM(value)) AS v FROM dbo.Tss_StdStringSplitUdf(ISNULL(@TafSelected,''), ',')) s
+    FROM (SELECT LTRIM(RTRIM(value)) AS v
+          FROM dbo.Tss_StdStringSplitUdf(ISNULL(@TafSelected, ''), ',')) s
     WHERE v LIKE '%:%'
 
-    DECLARE @AccFilter VARCHAR(MAX)=''
+    DECLARE @AccFilter VARCHAR(MAX) = ''
     IF EXISTS (SELECT 1 FROM #Pfx)
         SET @AccFilter = ' AND EXISTS (SELECT 1 FROM #Pfx p WHERE cBook.Cod_AccountCode LIKE p.Pfx + ''%'')'
-    ELSE IF ISNULL(@SiAccCodeBook,'')<>''
+    ELSE IF ISNULL(@SiAccCodeBook, '') <> ''
         SET @AccFilter = ' AND cBook.SiAccCodeBook IN (SELECT SiSel FROM dbo.Tss_StdStringSiFindUdf(''' + @SiAccCodeBook + '''))'
 
-    DECLARE @TafFilter VARCHAR(1000)=''
+    DECLARE @TafFilter VARCHAR(1000) = ''
     IF EXISTS (SELECT 1 FROM #Taf)
         SET @TafFilter = ' AND EXISTS (SELECT 1 FROM #Taf t WHERE (t.TafType=0 AND vDet.SiPubPersonsSpec1=t.SiTaf) OR (t.TafType=1 AND vDet.SiPubCostCenter1=t.SiTaf) OR (t.TafType=2 AND vDet.SiPubProjects1=t.SiTaf))'
-    ELSE IF ISNULL(@SiSelected,'')<>'' AND @TafName IS NOT NULL
+    ELSE IF ISNULL(@SiSelected, '') <> '' AND @TafName IS NOT NULL
         SET @TafFilter = ' AND vDet.' + @TafName + ' = ' + @SiSelected
 
     DECLARE @AccAllDocs SMALLINT = dbo.Tss_StdFindSystemParamValue('AccAllDocs')
 
     DECLARE @HiddenFilter VARCHAR(500)
-    IF dbo.Tss_StdFindIfUserIsInGroup(@SiUser,'AccStar') = 1
+    IF dbo.Tss_StdFindIfUserIsInGroup(@SiUser, 'AccStar') = 1
         SET @HiddenFilter = ''
     ELSE
         SET @HiddenFilter = ' AND (vDet.Sta_IsHidden = 0 OR vDet.Sta_IsHidden IS NULL) '
 
-    SELECT SiAccFinancePeriodToPlace INTO #TempTable FROM dbo.Tss_AccFinancePeriodToPlace
+    SELECT SiAccFinancePeriodToPlace
+    INTO #TempTable
+    FROM dbo.Tss_AccFinancePeriodToPlace
     WHERE SiPubSubLocations IN (SELECT * FROM dbo.Tss_StdStringSiFindUdf(@SiPubSubLocations))
 
     -- -------------------------------------------------------------------
     -- #TmpVchTaf: filtered voucher lines for the requested date range
     -- -------------------------------------------------------------------
     CREATE TABLE #TmpVchTaf (
-        SiAccVoucher_Hd      NUMERIC       NULL,
-        Dat_VhedDate         VARCHAR(10)   NULL,
-        Num_VDetRow          INT           NULL,
-        Des_VdetDesc         NVARCHAR(4000)NULL,
-        Num_VdetDebtAmount   BIGINT        NULL,
-        Num_VdetCreditAmount BIGINT        NULL,
-        Num_VhedFinalNo      DECIMAL(18,0) NULL,
-        Num_VhedSubNo        DECIMAL(18,0) NULL,
-        Cod_AccountCode      VARCHAR(50)   NULL,
-        Des_AccountDesc      NVARCHAR(200) NULL,
-        TafCode              VARCHAR(50)   NULL,
-        TafName              NVARCHAR(401) NULL
+        SiAccVoucher_Hd      NUMERIC        NULL,
+        Dat_VhedDate         VARCHAR(10)    NULL,
+        Num_VDetRow          INT            NULL,
+        Des_VdetDesc         NVARCHAR(4000) NULL,
+        Num_VdetDebtAmount   BIGINT         NULL,
+        Num_VdetCreditAmount BIGINT         NULL,
+        Num_VhedFinalNo      DECIMAL(18,0)  NULL,
+        Num_VhedSubNo        INT            NULL,   -- ← تغییر: numeric → INT
+        Cod_AccountCode      VARCHAR(50)    NULL,
+        Des_AccountDesc      NVARCHAR(200)  NULL,
+        TafCode              VARCHAR(50)    NULL,
+        TafName              NVARCHAR(401)  NULL
     )
 
     DECLARE @StatusFilter VARCHAR(100) =
-        CASE WHEN @AccAllDocs=0
+        CASE WHEN @AccAllDocs = 0
              THEN 'vHed.Sta_VochStatus >= 3 AND vHed.Sta_VochStatus <> 5 AND '
              ELSE 'vHed.Sta_VochStatus >= 3 AND ' END
 
@@ -8787,7 +8795,7 @@ BEGIN
         CAST(vDet.Num_VdetDebtAmount   AS BIGINT) AS Num_VdetDebtAmount,
         CAST(vDet.Num_VdetCreditAmount AS BIGINT) AS Num_VdetCreditAmount,
         CAST(vHed.Num_VhedFinalNo      AS DECIMAL(18,0)) AS Num_VhedFinalNo,
-        CAST(vHed.Num_VhedSubNo        AS DECIMAL(18,0)) AS Num_VhedSubNo,
+        CAST(vHed.Num_VhedSubNo        AS INT)           AS Num_VhedSubNo,   -- ← تغییر: INT
         CAST(cBook.Cod_AccountCode     AS VARCHAR(50))   AS Cod_AccountCode,
         CAST(cBook.Des_AccountDesc     AS NVARCHAR(200)) AS Des_AccountDesc,
         CAST(COALESCE(pv.Cod_PubPersonCode, cc.Cod_CostCenterCode, pr.Cod_ProjectsCode, '''') AS VARCHAR(50)) AS TafCode,
@@ -8795,10 +8803,10 @@ BEGIN
     FROM Tss_AccCodeBook cBook
     INNER JOIN Tss_AccVoucher_Dt vDet ON cBook.SiAccCodeBook = vDet.SiAccCodeBook
     INNER JOIN Tss_AccVoucher_Hd vHed ON vDet.SiAccVoucher_Hd = vHed.SiAccVoucher_Hd
-    INNER JOIN Tss_AccVoucherType ON vHed.SiAccVoucherType = Tss_AccVoucherType.SiAccVoucherType
+    INNER JOIN Tss_AccVoucherType   ON vHed.SiAccVoucherType = Tss_AccVoucherType.SiAccVoucherType
     LEFT JOIN Tss_PubPersonsViw pv ON vDet.SiPubPersonsSpec1 = pv.SiPubPersonsSpec
     LEFT JOIN Tss_PubCostCenter cc ON vDet.SiPubCostCenter1 = cc.SiPubCostCenter
-   LEFT JOIN Tss_PubProjects    pr ON vDet.SiPubProjects1   = pr.SiPubProjects
+    LEFT JOIN Tss_PubProjects   pr ON vDet.SiPubProjects1   = pr.SiPubProjects
     WHERE ' + @StatusFilter + N'
         vHed.SiAccFinancePeriodToPlace IN (SELECT SiAccFinancePeriodToPlace FROM #TempTable)
         AND vHed.Dat_VhedDate BETWEEN ''' + @DsFromDate + N''' AND ''' + @DsToDate + N'''
@@ -8874,7 +8882,7 @@ BEGIN
         Num_VdetDebtAmount   BIGINT         NULL,
         Num_VdetCreditAmount BIGINT         NULL,
         Num_VhedFinalNo      DECIMAL(18,0)  NULL,
-        Num_VhedSubNo        DECIMAL(18,0)  NULL,
+        Num_VhedSubNo        INT            NULL,   -- ← تغییر: numeric → INT
         Cod_AccountCode      VARCHAR(50)    NULL,
         Des_AccountDesc      NVARCHAR(200)  NULL,
         TafCode              VARCHAR(50)    NULL,
@@ -8892,8 +8900,8 @@ BEGIN
             CAST(N''مانده از قبل'' AS NVARCHAR(4000)) AS Des_VdetDesc,
             CAST(ISNULL(Num_VdetDebtAmount, 0)   AS BIGINT) AS Num_VdetDebtAmount,
             CAST(ISNULL(Num_VdetCreditAmount, 0) AS BIGINT) AS Num_VdetCreditAmount,
-       CAST(0 AS DECIMAL(18,0))  AS Num_VhedFinalNo,
-            CAST(0 AS DECIMAL(18,0))  AS Num_VhedSubNo,
+            CAST(0 AS DECIMAL(18,0))  AS Num_VhedFinalNo,
+            CAST(0 AS INT)            AS Num_VhedSubNo,   -- ← تغییر: INT
             CAST('''' AS VARCHAR(50)) AS Cod_AccountCode,
             CAST('''' AS NVARCHAR(200)) AS Des_AccountDesc,
             CAST('''' AS VARCHAR(50)) AS TafCode,
@@ -8936,7 +8944,7 @@ BEGIN
             CAST(ROW_NUMBER() OVER (ORDER BY Dat_VhedDate, SiAccVoucher_Hd, Num_VDetRow) AS DECIMAL(18,0)) AS MyId,
             SiAccVoucher_Hd,
             CAST(Num_VhedFinalNo AS DECIMAL(18,0)) AS Num_VhedFinalNo,
-            CAST(Num_VhedSubNo   AS DECIMAL(18,0)) AS Num_VhedSubNo,
+            CAST(Num_VhedSubNo   AS INT)           AS Num_VhedSubNo,   -- ← تغییر: INT
             Dat_VhedDate,
             LEFT(Dat_VhedDate, 7) AS Dat_VhedDateMonth,
             Num_VDetRow,
@@ -8967,9 +8975,7 @@ BEGIN
     DROP TABLE IF EXISTS #Pfx
     DROP TABLE IF EXISTS #Taf
 END
-
 GO
-
 alter PROCEDURE Tss_PubUntBankVStp
 (  
    @InternalWhere VarChar(8000)='',
